@@ -38,6 +38,7 @@ if __name__ == "__main__":
         flush_pipe = FlushPipe(m)
         flush_pipe.start_process()
         procs.append(flush_pipe)
+        time.sleep(10)
 
     now = time.time()
     while True:

@@ -4,13 +4,13 @@ import pandas as pd
 import sqlite3
 import numpy as np
 
-from sim.CONFIG import ROOT
+from CONFIG import ROOT
 
 pd.set_option('display.max_columns', None)
 import talib as tb
+print(ROOT+"/data/DB/stock_price1.db")
 conn = sqlite3.connect (ROOT+"/data/DB/stock_price1.db")
 tm =(19, 28)
-
 
 def ta_idx(df):
          o = df['open'].values
@@ -53,10 +53,27 @@ def ta_idx(df):
 
 
 
+def get_dt_base(df_o):
+    base = df_o[ (df_o.h <tm[0])][['st_dt','high', 'low',  'close','volume']]
+    base['HL'] = base.high-base.low
+    del base['high']
+    del base['low']
+
+    dt = base.groupby('st_dt').agg(['mean', 'std', 'min', 'max'])
+    dt.columns = dt.columns.map('_'.join)
+
+
+    base['prd'] = base['close'] * base['volume']
+    base = base.groupby(base.st_dt).sum()
+    # base["base_price"] = base.prd / base.volume
+    dt['base_price'] = base.prd / base.volume
+    dt = dt.reset_index()
+
+    return dt
 
 
 def get_base():
-    ql = "select * from min_CLK20 where st_dt between '20200305' and '20200403'"
+    ql = "select * from min_CLK20 where st_dt between '20200309' and '20200403'"
     df_o = pd.read_sql_query (ql, conn)
     df_o['tm_key'] = pd.to_datetime (df_o.tm_key)
     del df_o['dt']
@@ -66,28 +83,16 @@ def get_base():
 
     df_o['mm'] = (df_o.h - 8) * 60 + df_o.m
     df_o['m_diff'] = (df_o['mm'] - df_o['mm'].shift(1)).fillna(0)
-    df_o['price'] = df_o['open'] + (df_o['close'] -df_o['open'])*0.8
-    df_o['return5'] =  (df_o['price'] - df_o['price'].shift(-5)).fillna(0)
-
-
-
+    df_o['price'] = df_o['open'] + (df_o['close'] -df_o['open'])*0.2
+    df_o['transaction'] = (df_o['price'].shift(-1)).fillna(0)
+    del df_o['price']
+    df_o['return5'] = (df_o['transaction'].shift(-5) -df_o['transaction']).fillna(0)
+    df_o['return1'] = (df_o['transaction'].shift(-1) - df_o['transaction']).fillna(0)
 
     df = df_o[ (df_o.h >=tm[0]-1) & (df_o.h <=tm[1]+1)]
-    base = df_o[ (df_o.h <tm[0])][['st_dt','close','volume']]
-    base['prd'] = base['close'] * base['volume']
-    base = base.groupby(base.st_dt).sum()
-    base["base_price"] = base.prd / base.volume
-    base["base_vol"] = base.volume / 1000
-    del base["prd"]
-    del base["close"]
-    del base["volume"]
+    base = get_dt_base(df_o)
 
-    print(base.head(50))
     return df, base
-
-def trim_(df):
-
-    return df
 
 def get_data():
     df, base = get_base()
@@ -102,30 +107,34 @@ def get_data():
     return df, base
 
 def adj(df, base):
+
     df = df.copy()
-    del df['open']
-    del df['close']
-    del df['high']
-    del df['low']
     df= pd.merge(left=df, right=base, how="left", on='st_dt')
-    df['price'] = df.price - df.base_price
-    df['volume'] = df.volume/df.base_vol
-    del df['base_price']
-    del df['base_vol']
+    df['volume'] = df.volume / df.volume_mean
+
+    prices = ['open', 'high', 'low', 'close', 'transaction']
+    for name in prices:
+        df[name] = df[name] - df.base_price
+
+    print(base.head(3))
     print ("ADJ HAS NAN", df.isna().sum().values.sum())
-    return df
+    return df, base
 
 
 def save():
     df, base = get_data()
-    df.to_sql("data_19_28", conn,index=False)
-    adj_df = adj(df, base)
-    adj_df.to_sql("adj_19_28", conn,index=False)
+    df.to_sql("data_19_28", conn,index=False, if_exists='replace')
 
 
-Day = namedtuple('day', ['data', 'price'])
-def load():
-    ql = "select * from adj_19_28"
+    adj_df, base = adj(df, base)
+
+    adj_df.to_sql("adj_19_28", conn,index=False,if_exists='replace')
+    base.to_sql("base_19_28", conn, index=False, if_exists='replace')
+
+
+Day = namedtuple('day', ['dt', 'data', 'price', 'base'])
+def load_ori():
+    ql = "select * from data_19_28"
     df = pd.read_sql_query (ql, conn)
     grouped = df.groupby('st_dt')
     days =  [ group.reset_index(drop=True) for _, group in grouped]
@@ -136,20 +145,73 @@ def load():
         del df['st_dt']
         del df['return5']
         del df['m_diff']
-        price = df['price']
-        del df['price']
+        price = df['transaction']
+        del df['transaction']
         all_days.append(Day(df.to_numpy(), price.to_numpy()))
     feature_size = len(days[0].columns)
 
     print(feature_size)
     print(days[0].head(3))
-    all_days = all_days[8:15]
-    return all_days, len(all_days), feature_size
+    return all_days, feature_size
 
-DATA, DAYS, feature_size = load()
+def load():
+    ql = "select * from adj_19_28"
+    df = pd.read_sql_query (ql, conn)
+    grouped = df.groupby('st_dt')
+    days =[ (key, group.reset_index(drop=True)) for key, group in grouped]
+
+
+    all_days =[]
+
+    for (st_dt, df) in days:
+        del df['st_dt']
+        del df['return5']
+        del df['return1']
+        del df['m_diff']
+        del df['open']
+        del df['high']
+        del df['low']
+        price = df['transaction']
+        del df['transaction']
+        ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
+        base = pd.read_sql_query(ql, conn)
+        del base['st_dt']
+        all_days.append(Day(st_dt, df.to_numpy(), price.to_numpy(), base.to_numpy()[0]))
+
+    for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
+    feature_size = len(df.columns)
+    base_size = len(base.columns)
+
+    print(feature_size, base_size)
+    print(df.head(2))
+    print(base.head(2))
+    print(all_days[0].base)
+    return all_days, feature_size, base_size
+
+def split(all_days):
+    # idxes = list(range(len(all_days)))
+    # e_day = idxes[-3:]
+    # extra = [3,10,14,17]
+    # e_day = list(set(extra+e_day))
+    # t_day = [i for i in idxes if i not in e_day]
+
+    t_day = [8, 9,10,11, 12, 13, 14]
+    e_day = [14, 15, 16]
+    print("TAIN ON:",t_day)
+    print("TEST ON:", e_day)
+
+    train = [all_days[i] for i in t_day]
+    test = [all_days[i] for i in e_day]
+    return train, len(train), test
+
 
 if __name__ == '__main__':
     load()
+else:
+    all_days, feature_size, base_size = load()
+    TRAIN, TRAIN_DAYS, TEST = split(all_days)
+
+
 
 
 

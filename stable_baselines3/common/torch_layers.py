@@ -1,18 +1,11 @@
 from itertools import zip_longest
 from typing import Dict, List, Tuple, Type, Union
 
-import gym
-import torch as th
-from torch import nn
-
-from sim.CONFIG import *
+from CONFIG import *
 from stable_baselines3.common.preprocessing import get_flattened_obs_dim, is_image_space
-from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.common.utils import get_device
 from stable_baselines3.seq_nn import *
-
-
 
 
 class NatureCNN(BaseFeaturesExtractor):
@@ -61,11 +54,11 @@ class NatureCNN(BaseFeaturesExtractor):
 
 
 def create_mlp(
-    input_dim: int,
-    output_dim: int,
-    net_arch: List[int],
-    activation_fn: Type[nn.Module] = nn.ReLU,
-    squash_output: bool = False,
+        input_dim: int,
+        output_dim: int,
+        net_arch: List[int],
+        activation_fn: Type[nn.Module] = nn.ReLU,
+        squash_output: bool = False,
 ) -> List[nn.Module]:
     """
     Create a multi layer perceptron (MLP), which is
@@ -128,11 +121,11 @@ class MlpExtractor(nn.Module):
     """
 
     def __init__(
-        self,
-        feature_dim: int,
-        net_arch: List[Union[int, Dict[str, List[int]]]],
-        activation_fn: Type[nn.Module],
-        device: Union[th.device, str] = "auto",
+            self,
+            feature_dim: int,
+            net_arch: List[Union[int, Dict[str, List[int]]]],
+            activation_fn: Type[nn.Module],
+            device: Union[th.device, str] = "auto",
     ):
         super(MlpExtractor, self).__init__()
         device = get_device(device)
@@ -224,21 +217,11 @@ class CombinedExtractor(BaseFeaturesExtractor):
         # TODO we do not know features-dim here before going over all the items, so put something there. This is dirty!
         super(CombinedExtractor, self).__init__(observation_space, features_dim=1)
 
-        extractors = {}
-        total_concat_size = 0
+        extractors = {OBS: SeqFeature(observation_space.spaces[OBS])
+            , STAT: FlattenExtractor(observation_space.spaces[STAT])
+            , BASE: BaseFeature(observation_space.spaces[BASE])}
 
-        for key, subspace in observation_space.spaces.items():
-            if key ==OBS:
-                extractors[OBS] =SeqFeature(subspace) # SeqFeature(subspace)
-                total_concat_size += extractors[OBS]._features_dim
-
-            elif key == STAT:
-                # The observation key is a vector, flatten it if needed
-                extractors[key] = nn.Flatten()
-                total_concat_size += get_flattened_obs_dim(subspace)
-            else:
-                raise Exception("Obs Dict has wrong key")
-
+        total_concat_size = sum([module.features_dim for module in extractors.values()])
         self.extractors = nn.ModuleDict(extractors)
         self._features_dim = total_concat_size
 

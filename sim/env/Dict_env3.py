@@ -11,7 +11,7 @@ import math
 
 # ------------------------- GLOBAL PARAMETERS -------------------------
 # Start and end period of historical data in question
-from sim.CONFIG import *
+from CONFIG import *
 from sim.env import DATA
 from sim.epi_plot import EpisodePlot
 import time

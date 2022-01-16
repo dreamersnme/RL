@@ -4,13 +4,24 @@ import torch as th
 from torch import nn
 
 from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
+class BaseFeature(BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.Space, out_dim=8):
+        super(BaseFeature, self).__init__(observation_space, features_dim=out_dim)
+        in_dim = gym.spaces.utils.flatdim(observation_space)
+        self.dense = nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            nn.ReLU()
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.dense(observations)
 
 
 
 class SeqFeature(BaseFeaturesExtractor):
     def __init__(self, obs_space: gym.spaces.Box):
         super (SeqFeature, self).__init__ (obs_space, features_dim=1)
-        extractors =[ SeqCRNN(obs_space), SeqLast(obs_space)]
+        extractors =[ SeqCRNN(obs_space, 32), SeqLstm(obs_space,32), SeqLast(obs_space)]
         total_concat_size = 0
         for ex in extractors:
             total_concat_size += ex._features_dim
@@ -25,8 +36,8 @@ class SeqFeature(BaseFeaturesExtractor):
         return th.cat(encoded_tensor_list, dim=1)
 
 class SeqCNN (BaseFeaturesExtractor):
-    ch1 = 3
-    def __init__(self, observation_space: gym.spaces.Box, span=2, outdim: int = 64):
+    ch1 = 4
+    def __init__(self, observation_space: gym.spaces.Box, span=3, outdim: int = 64):
         super (SeqCNN, self).__init__ (observation_space, features_dim=outdim)
         seq_len = observation_space.shape[0]
         seq_width = observation_space.shape[1]
@@ -65,8 +76,8 @@ class LstmLast(nn.Module):
 
 
 class SeqCRNN (BaseFeaturesExtractor):
-    ch1 = 5
-    def __init__(self, observation_space: gym.spaces.Box, span=3, outdim: int = 128):
+    ch1 = 4
+    def __init__(self, observation_space: gym.spaces.Box, outdim: int = 32, span=3):
         super (SeqCRNN, self).__init__ (observation_space, features_dim=outdim)
         seq_len = observation_space.shape[0]
         seq_width = observation_space.shape[1]
@@ -89,7 +100,7 @@ class SeqCRNN (BaseFeaturesExtractor):
 
 
 class SeqLstm (BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 128):
+    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 32):
         super (SeqLstm, self).__init__ (observation_space, features_dim=out_dim)
         seq_width = observation_space.shape[1]
         # self.lstm = LstmLast(seq_width=seq_width, hidden=hidden)

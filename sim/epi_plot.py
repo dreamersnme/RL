@@ -57,6 +57,8 @@ class APlot():
         x, y = self.getLims ()
         self.ax.set_xlim (x[0], x[1])
         self.ax.set_ylim (y[0], y[1])
+    def grid(self):
+        self.ax.grid(True, axis='y', alpha=0.2, linestyle='--')
 
 
 class EpisodePlot:
@@ -72,20 +74,23 @@ class EpisodePlot:
         self.asset = []
         self.risk = []
         plt.ion ()
-        self.fig = plt.figure (figsize=(7, 5), constrained_layout=True)
+        self.fig = plt.figure (figsize=(10, 5), constrained_layout=True)
         self.fig.canvas.set_window_title(title)
         self.init_fig ()
 
     def init_fig(self):
-        grid_ax = self.fig.subplots(2, 2, gridspec_kw={'width_ratios': [2, 1],
+        grid_ax = self.fig.subplots(2, 2, gridspec_kw={'width_ratios': [5, 1],
                                          'height_ratios': [3, 1]})
 
+        lines = [{'color': 'gray', 'label': 'Stock', 'lw': 0.5, 'alpha': 0.5}]
+        pp =APlot(self.PLOTS, "stock", grid_ax[0,0], lines)
         lines = [
-            {'color': 'g', 'label': 'Account', 'alpha': 0.8},
-            {'color': 'r', 'label': 'Unrealized', 'alpha': 0.8},
-            {'color': 'b', 'label': 'Total', 'alpha': 0.6},
-            {'color': 'gray', 'label': 'Reward', 'alpha': 0.6}]
-        APlot (self.PLOTS, "all", grid_ax[0,0], lines)
+            {'color': 'g', 'label': 'Reward','lw': 0.5, 'alpha': 0.8},
+            {'color': 'r', 'label': 'Unrealized', 'lw': 0.5, 'alpha': 0.8},
+            {'color': 'b', 'label': 'Total', 'lw': 0.5, 'alpha': 0.5}]
+        APlot (self.PLOTS, "all", pp.ax.twinx(),lines).grid()
+
+
 
         BoxPlot (self.PLOTS, "posneg", grid_ax[0,1], ['Pos', 'Neg'])
 
@@ -122,10 +127,10 @@ class EpisodePlot:
         neg = info['neg']
 
         self.fig.suptitle ('Train iteration {}'.format (iteration), fontsize=11)
-        self._update_line ("all", 0, idx, info["cash"])
+        self._update_line ("all", 0, idx, info["reward"])
         self._update_line ("all", 1, idx, info["unreal"])
         self._update_line ("all", 2, idx, info["asset"])
-        self._update_line ("all", 3, idx, info["reward"])
+        self._update_line ("stock", 0, idx, info["stock"])
 
         self._update_line ('pos', 0, idx, info["position"])
         self._update_line ("unit", 0, idx, info["unit"])

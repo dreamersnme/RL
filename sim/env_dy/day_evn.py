@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 import numpy as np
 
-from datetime import datetime, timedelta
 from gym.utils import seeding
 import gym
 from gym import spaces
@@ -12,7 +11,7 @@ import math
 # ------------------------- GLOBAL PARAMETERS -------------------------
 # Start and end period of historical data in question
 from SOL import extractor
-from sim.CONFIG import *
+from CONFIG import *
 from sim.epi_plot import EpisodePlot
 import time
 
@@ -22,28 +21,23 @@ STARTING_ACC_BALANCE = 0
 MAX_TRADE = 2
 
 
-
-
 class Days(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    @classmethod
-    def get_epi_days(self):
-        return extractor.DAYS
-
-    def __init__(self, title="MAIN", verbose=False, plot_dir=None, seq=5):
+    def __init__(self, title="MAIN", test=False, verbose=False, plot_dir=None, seq=5):
         self.plot_fig = None if not plot_dir else EpisodePlot(title, plot_dir)
         self.title = title
         self.iteration = 0
         self.verbose = verbose
         self.seq = seq
-        self.DATA = extractor.DATA
+        self.DATA = extractor.TEST if test else extractor.TRAIN
         feature_length = extractor.feature_size
+        base_feature_len = extractor.base_size
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float16)
-
-        obs = spaces.Box(low=-np.inf, high=np.inf, shape=(self.seq, feature_length,))
+        obs = spaces.Box(low=-np.inf, high=np.inf, shape=(self.seq, feature_length))
         stat = spaces.Box(low=-np.inf, high=np.inf, shape=(2,))
-        self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (STAT, stat)]))
+        base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_feature_len,))
+        self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (STAT, stat), (BASE, base)]))
         self.reset_env()
 
 
@@ -62,6 +56,7 @@ class Days(gym.Env):
         self.unit_log = [0]
         self.position_log = [0]
         self.unrealized_asset = [0]
+        self.price_log =[0]
         self.done = True
 
     def reset(self):
@@ -71,15 +66,18 @@ class Days(gym.Env):
             self.reset_env()
 
         TODAY = self.DATA[self.today]
-        self.STATES = TODAY.data
-        self.PRICE = TODAY.price
-        self.END = self.STATES.shape[0]-1-1# 마지막인덱스는 최후청산용,신규 obs로 못씀
+        self.OBSERV = TODAY.data
+        self.PRICE = (TODAY.price/TIC)*TIC_VAL
+        self.BASE = TODAY.base
+
+
+        self.END = self.OBSERV.shape[0] - 1 - 1# 마지막인덱스는 최후청산용,신규 obs로 못씀
 
         self.step_no = self.seq - 1 # 0부터 시작
-        obs = self.get_obs()
+
         unrealized_pnl = 0.0
-        stat = [unrealized_pnl, 0]
-        self.state = OrderedDict([(OBS, obs), (STAT, stat)])
+        self.state = self.get_obs(unrealized_pnl, 0)
+
 
         self.done = False
         self.buy_price = 0
@@ -87,8 +85,12 @@ class Days(gym.Env):
         self.iteration += 1
         return self.state
 
-    def get_obs(self):
-        return self.STATES[self.step_no - self.seq+1: self.step_no+1]
+    def get_obs(self, unrealized_pnl, pos):
+        obs = self.OBSERV[self.step_no - self.seq + 1: self.step_no + 1]
+        stat = [unrealized_pnl, pos]
+        base = self.BASE
+        stat_dict = OrderedDict([(OBS, obs), (STAT, stat),(BASE, base)])
+        return stat_dict
 
 
     def getprice(self, step=None):
@@ -156,14 +158,22 @@ class Days(gym.Env):
         self.acc_balance = np.append(self.acc_balance, new_bal)
         self.position_log = np.append(self.position_log, new_stat)
 
+
+
         # NEXT DAY
         unrealized_pnl = self._unrealized_profit(new_stat, self.buy_price)
         stat = [unrealized_pnl, new_stat]
-        obs = self.get_obs()
-        self.state = OrderedDict([(OBS, obs), (STAT, stat)])
+
+
+        self.state = self.get_obs(unrealized_pnl, new_stat)
+        # test_price = self.getprice(self.step_no - 1)
+        # cal = obs[-1][0] + (obs[-1][3] - obs[-1][0]) * 0.2
+        # print(test_price - cal)
+
+
+
         total_asset_ending = new_bal + unrealized_pnl
         step_profit = total_asset_ending - total_asset_starting
-
         if step_profit < 0:
             self.total_neg = np.append(self.total_neg, step_profit)
         else:
@@ -228,14 +238,18 @@ class Days(gym.Env):
         else: pass
         self.buy_price = buy_price
         profit = realized - new_cost
+        self.price_log = np.append(self.price_log, self.getprice())
         return new_share, profit
 
     def cal_reward(self, pre_stat, new_stat, step_profit, pre_price):
+
         returns = self.cal_emph_reward(step_profit)
         risk = self.remain_risk(new_stat)
-        optimal = self.cal_opt_reward(step_profit, pre_stat, pre_price, new_stat)
-        reward = returns - 0.01 * risk
+        reward = returns #- 0.5 * risk #2틱 risk = 3$ 1틱 1.25
+        # optimal = self.cal_opt_reward(step_profit, pre_stat, pre_price, new_stat)
+
         # reward += (max(optimal, -5))
+
         self.reward_log = np.append(self.reward_log, reward)
         return reward
 
@@ -268,29 +282,24 @@ class Days(gym.Env):
             profit = max(profit, pow(profit, 1.2))
         return profit
 
-    def cal_emph_reward(self, profit):
-        profit = profit / MAX_TRADE
-        if profit < 0:
-            profit = min(profit, -1 * pow(abs(profit), 1.5))
-        else:
-            profit = max(profit, pow(profit, 1.2))
-        return profit
-        return reward
 
     def render(self, mode='humran'):
         total_neg = 0 if len(self.total_neg) ==0 else np.sum(self.total_neg)
-        risk_log = 2 if len(self.total_pos) ==0 else (-1 * total_neg / np.sum(self.total_pos))
+
         if self.verbose:
             print( "UP-: {}, DWN-: {}, Commition: {}".format(self.up_cnt, self.down_cnt, self.total_commition)
                   , "Acc: {}, Rwd: {}, Neg: {}".format(int(self.total_asset[-1]), int(sum(self.reward_log)),
                                                        int(total_neg)))
 
+        adj_price = self.price_log - self.price_log[1]
+        adj_reward = self.reward_log.cumsum()
 
+        adj_reward = adj_reward * (  (self.total_asset.max() - self.total_asset.min())/ (adj_reward.max()-adj_reward.min()))
         if not self.plot_fig: return self.state
         self.plot_fig.update(iteration=self.iteration , idx=range(len(self.position_log)), pos=self.total_pos,
                              neg=-self.total_neg,
-                             cash=self.acc_balance, unreal=self.unrealized_asset, asset=self.total_asset,
-                             reward=self.reward_log.cumsum(), position=self.position_log, unit=self.unit_log)
+                             stock=adj_price, unreal=self.unrealized_asset, asset=self.total_asset,
+                             reward=adj_reward, position=self.position_log, unit=self.unit_log)
         return self.state
 
     def _seed(self, seed=None):

@@ -3,6 +3,8 @@ import shutil
 import time
 
 from torch.utils.tensorboard import SummaryWriter
+
+from SOL import extractor
 from runner.callbacks import LearnEndCallback
 from sim.env_dy.day_evn import Days
 from stable_baselines3.common.noise import NormalActionNoise
@@ -15,16 +17,16 @@ ENV = Days
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
-    unit_episode = Days.get_epi_days()
+    unit_episode = extractor.TRAIN_DAYS
     train_epi = unit_episode * 1
-    grad_steps =[(1e5, 2), (3e5)]
+    grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.5
     seq = 5
-    def __init__(self, MODEL, arc=[128, 64], nproc=1, retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, arc=[64], nproc=1, retrain=False, batch_size=128, seed=None):
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
-        self.test_env =  ENV(title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
+        self.test_env =  ENV(title=self.name, test=True, verbose=True, plot_dir="./sFig/{}".format(self.name))
         self.env = self.make_env()
         self.writer = self.tensorboard("./summary_all/{}/".format(self.name))
         self.save = f"ckpt_{self.name}"
@@ -67,7 +69,7 @@ class IterRun:
     def init_boost(self, MIN_TRADE, min_reward=-1000):
         print("-----  BOOST UP", self.name)
 
-        test_env = ENV(verbose=False)
+        test_env = ENV(verbose=False, test=True)
         minimum = -1e8
         suit_model = None
 
@@ -94,6 +96,7 @@ class IterRun:
             if reward > min_reward: break
         if suit_model is None:
             suit_model = bad_model
+            self.buffer = suit_model.replay_buffer
             print(" - - - - - BOOST Selection Failed: ", self.name, "Bad Model Count", max_cont)
 
         else:
@@ -108,7 +111,6 @@ class IterRun:
 
     def _create(self, env=None, learning_starts = 100):
         policy_kwargs = dict(net_arch=self.arch)
-
         noise = NormalActionNoise(
             mean=np.zeros(1), sigma=self.noise_std * np.ones(1)
         )
@@ -116,7 +118,7 @@ class IterRun:
         seed = self.seed or np.random.randint(1e8)
         model = self.model_cls("MultiInputPolicy", env, verbose=1, action_noise=noise, seed =seed,
                                gradient_steps= 1, gamma=1.0,
-                               batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=500_000,
+                               batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=1000_000,
                                learning_starts=learning_starts)
         return model
 
