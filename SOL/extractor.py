@@ -27,10 +27,11 @@ def ta_idx(df):
          ta = pd.DataFrame()
          ta['MA5'] = tb.MA(c, timeperiod=5) / np.nanmean(tb.MA(c, timeperiod=5))
          ta['MA10'] = tb.MA(c, timeperiod=10) / np.nanmean(tb.MA(c, timeperiod=10))
-         ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
          ta['vMA5'] = tb.MA(v, timeperiod=5) / np.nanmean(tb.MA(v, timeperiod=5))
          ta['vMA10'] = tb.MA(v, timeperiod=10) / np.nanmean(tb.MA(v, timeperiod=10))
-         ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
+
+         # ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
+         # ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
          ta['ADX'] = tb.ADX(h, l, c, timeperiod=14) / np.nanmean(tb.ADX(h, l, c, timeperiod=14))
          ta['ADXR'] = tb.ADXR(h, l, c, timeperiod=14) / np.nanmean(tb.ADXR(h, l, c, timeperiod=14))
          ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
@@ -67,6 +68,7 @@ def get_dt_base(df_o):
     base = base.groupby(base.st_dt).sum()
     # base["base_price"] = base.prd / base.volume
     dt['base_price'] = base.prd / base.volume
+    dt['HL'] = dt.close_max - dt.close_min
     dt = dt.reset_index()
 
     return dt
@@ -109,28 +111,35 @@ def get_data():
 def adj(df, base):
 
     df = df.copy()
-    df= pd.merge(left=df, right=base, how="left", on='st_dt')
+
+    base2 = base[['st_dt','base_price', 'volume_mean']]
+    df= pd.merge(left=df, right=base2, how="left", on='st_dt')
     df['volume'] = df.volume / df.volume_mean
 
     prices = ['open', 'high', 'low', 'close', 'transaction']
     for name in prices:
         df[name] = df[name] - df.base_price
 
-    print(base.head(3))
+    del df['base_price']
+    del df['volume_mean']
+
     print ("ADJ HAS NAN", df.isna().sum().values.sum())
     return df, base
 
 
 def save():
     df, base = get_data()
-    df.to_sql("data_19_28", conn,index=False, if_exists='replace')
-
 
     adj_df, base = adj(df, base)
-
+    df.to_sql("data_19_28", conn, index=False, if_exists='replace')
     adj_df.to_sql("adj_19_28", conn,index=False,if_exists='replace')
     base.to_sql("base_19_28", conn, index=False, if_exists='replace')
-
+    print("-------------BASE---------------")
+    print(base.head(2))
+    print("-------------DATA---------------")
+    print(df.head(3))
+    print("-------------ADJ---------------")
+    print(adj_df.head(3))
 
 Day = namedtuple('day', ['dt', 'data', 'price', 'base'])
 def load_ori():
@@ -175,7 +184,7 @@ def load():
         del df['transaction']
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
-        del base['st_dt']
+        base = base.drop(columns=['st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
         all_days.append(Day(st_dt, df.to_numpy(), price.to_numpy(), base.to_numpy()[0]))
 
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
@@ -183,9 +192,11 @@ def load():
     base_size = len(base.columns)
 
     print(feature_size, base_size)
+    print("-----DATA")
     print(df.head(2))
+    print("-----BASE")
     print(base.head(2))
-    print(all_days[0].base)
+    print(all_days[-1].base)
     return all_days, feature_size, base_size
 
 def split(all_days):
