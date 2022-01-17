@@ -176,8 +176,10 @@ def _load(target, trim ):
         df =df.drop (columns=trim)
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
-        base = base.drop(columns=[ 'close_mean',  'close_std',  'close_min',  'close_max'])
-        all_days.append(Day(st_dt, df.to_numpy(), price.to_numpy(), base.to_numpy()[0]))
+        base = base.drop(columns=[ 'st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
+        all_days.append(Day(st_dt, df.to_numpy().astype(np.float32)
+                            , price.to_numpy().astype(np.float32)
+                            , base.to_numpy().astype(np.float32)[0]))
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
     feature_size = len(df.columns)
     base_size = len(base.columns)
@@ -193,12 +195,13 @@ def _load(target, trim ):
 
 def load_ml():
     all_days, feature_size, base_size = _load('return1'
-                 , ['transaction','return5','m_diff' , 'open','high' , 'low'])
-    return all_days
+                 , ['st_dt', 'transaction','return1', 'return5','m_diff' , 'open','high' , 'low'])
+    TRAIN, _, TEST = split(all_days)
+    return TRAIN, TEST
 
 def load():
     all_days, feature_size,  all_days, feature_size, base_size = _load('transaction'
-                 , ['transaction','return5','m_diff' , 'open','high' , 'low'])
+                 , ['st_dt', 'transaction','return5','m_diff' , 'open','high' , 'low'])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 
@@ -209,8 +212,8 @@ def split(all_days):
     # e_day = list(set(extra+e_day))
     # t_day = [i for i in idxes if i not in e_day]
 
-    e_day = idxes[-8:-2]
-    t_day = idxes
+    e_day = idxes[-8:]
+    t_day = idxes[:-5]
     print("TAIN ON:",t_day)
     print("TEST ON:", e_day)
 

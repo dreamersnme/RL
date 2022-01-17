@@ -1,21 +1,41 @@
+from copy import deepcopy
+
 import torch as th
 from torch.utils.data import Dataset
 import numpy as np
 
 from CONFIG import *
 from SOL import extractor
+from stable_baselines3.common.running_mean_std import RunningMeanStd
 
-
+TARGET ="target"
 class DLoader(Dataset):
-    def __init__(self, data, seq = 2):
+    epsilon: float = 1e-8
+    def __init__(self, data, normalizer = None, seq = 20):
         self.data = data
         self.day_cnt = len(data)
-        # self.obs = [d.data for d in data]
-        # self.base = [d.base for d in data]
-        # self.target = [d.price for d in data]
+        self.target = [d.price.reshape(-1,1) for d in data]
         self.seq = seq
+        self.feature_len = self.data[0].data.shape[1]
+        self.base_len = self.data[0].base.shape[0]
+
         self.daily_size = [day.data.shape[0] - seq+1 for day in self.data]
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
+        self.normalizer = normalizer
+        if normalizer is None: self.normalizer = self._get_normalizer()
+
+    def _get_normalizer(self):
+        obsN = RunningMeanStd(shape=(self.seq, self.feature_len))
+        baseN = RunningMeanStd(shape=(self.base_len,))
+        targetN = RunningMeanStd(shape=(1,))
+
+        for idx in range(self.__len__()):
+            obs, base, target = self.__getitem(idx)
+            obsN.update(obs)
+            baseN.update(base)
+            targetN.update(target)
+
+        return {OBS: obsN, BASE:baseN, TARGET:targetN}
 
     def day_search(self, idx):
         left = 0
@@ -27,25 +47,44 @@ class DLoader(Dataset):
         idx = idx - self.daily_idx[left]
         return left, idx
 
+    def normalize(self, key, obs):
+        obs_rms = self.normalizer[key]
+        return ((obs - obs_rms.mean) / np.sqrt(obs_rms.var + self.epsilon) ).astype(np.float32)
 
-    def __getitem__(self, idx):
+
+    def abs_diff(self, pred, true):
+        obs_rms = self.normalizer[TARGET]
+        pred =  (pred * np.sqrt(obs_rms.var + self.epsilon)) + obs_rms.mean
+        true = (true * np.sqrt(obs_rms.var + self.epsilon)) + obs_rms.mean
+        return np.abs(pred-true)
+
+
+
+
+    def __getitem(self, idx):
         if idx >= self.daily_idx[-1]: raise IndexError(idx)
-        day, idx = self.day_search(idx)
-        day = self.data[day]
+        day_no, idx = self.day_search(idx)
+        day = self.data[day_no]
         s_idx = idx
         e_idx = idx+self.seq-1
         obs = day.data[s_idx: e_idx+1]
-        return {"Y": day.price[e_idx], "X":{OBS:obs,BASE: day.base}}
+        return obs, day.base, self.target[day_no][e_idx]
+
+    def __getitem__(self, idx):
+        obs, base, target = self.__getitem(idx)
+        return ({OBS:self.normalize(OBS,obs)
+                    ,BASE:self.normalize(BASE,base)}, self.normalize(TARGET,target))
 
     def __len__(self):
         return self.daily_idx[-1]
 
 
 if __name__ == "__main__":
-    loader = DLoader(extractor.load_ml())
-    print(loader.__len__())
+    data, test = extractor.load_ml()
 
-    print (loader.__getitem__ (11352))
+    loader = DLoader(data)
+    print(loader.__len__())
+    # print (loader.__getitem__ (11352))
 
     # print(loader.day_search(0))
     # print (loader.day_search (593))
