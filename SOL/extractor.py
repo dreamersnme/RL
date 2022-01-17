@@ -173,10 +173,10 @@ def _load(target, trim ):
 
     for (st_dt, df) in days:
         price = df[target]
-        df =df.drop(columns=trim)
+        df =df.drop (columns=trim)
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
-        base = base.drop(columns=['st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
+        base = base.drop(columns=[ 'close_mean',  'close_std',  'close_min',  'close_max'])
         all_days.append(Day(st_dt, df.to_numpy(), price.to_numpy(), base.to_numpy()[0]))
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
     feature_size = len(df.columns)
@@ -184,19 +184,21 @@ def _load(target, trim ):
 
     print(feature_size, base_size)
     print("-----DATA")
-    print(df.head(2))
+    print(df.head(3))
     print("-----BASE")
-    print(base.head(2))
-    print(all_days[-1].base)
+    print(base.head())
+    print("-----PRICE")
+    print(price.head(3))
     return all_days, feature_size, base_size
 
-def load():
-    return _load('transaction'
-                 , ['transaction', 'st_dt','return5' , 'return1','m_diff' , 'open','high' , 'low'])
-
 def load_ml():
-    all_days, feature_size, _load('return1'
-                 , ['transaction', 'st_dt','return5' , 'return1','m_diff' , 'open','high' , 'low'])
+    all_days, feature_size, base_size = _load('return1'
+                 , ['transaction','return5','m_diff' , 'open','high' , 'low'])
+    return all_days
+
+def load():
+    all_days, feature_size,  all_days, feature_size, base_size = _load('transaction'
+                 , ['transaction','return5','m_diff' , 'open','high' , 'low'])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 
@@ -208,7 +210,7 @@ def split(all_days):
     # t_day = [i for i in idxes if i not in e_day]
 
     e_day = idxes[-8:-2]
-    t_day = idxes[:-5]
+    t_day = idxes
     print("TAIN ON:",t_day)
     print("TEST ON:", e_day)
 
@@ -219,9 +221,7 @@ def split(all_days):
 
 if __name__ == '__main__':
     load_ml()
-else:
-    all_days, feature_size, base_size = load()
-    TRAIN, TRAIN_DAYS, TEST = split(all_days)
+
 
 
 
