@@ -16,13 +16,13 @@ import numpy as np
 ENV = Days
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 1
+    BOOST_SEARCH = 4
     unit_episode = extractor.TRAIN_DAYS
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
-    noise_std = 0.5
+    noise_std = 0.7
     seq = 5
-    def __init__(self, MODEL, arc=[64], nproc=1, retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, arc=[128, 64], nproc=1, retrain=False, batch_size=128, seed=None):
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__

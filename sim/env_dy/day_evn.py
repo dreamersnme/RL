@@ -287,7 +287,7 @@ class Days(gym.Env):
         total_neg = 0 if len(self.total_neg) ==0 else np.sum(self.total_neg)
 
         if self.verbose:
-            print( "UP-: {}, DWN-: {}, Commition: {}".format(self.up_cnt, self.down_cnt, self.total_commition)
+            print( self.title, self.iteration, "UP-: {}, DWN-: {}, Commition: {}".format(self.up_cnt, self.down_cnt, self.total_commition)
                   , "Acc: {}, Rwd: {}, Neg: {}".format(int(self.total_asset[-1]), int(sum(self.reward_log)),
                                                        int(total_neg)))
 
@@ -305,3 +305,5 @@ class Days(gym.Env):
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
+
+

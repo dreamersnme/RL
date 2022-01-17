@@ -163,30 +163,21 @@ def load_ori():
     print(days[0].head(3))
     return all_days, feature_size
 
-def load():
+def _load(target, trim ):
     ql = "select * from adj_19_28"
     df = pd.read_sql_query (ql, conn)
     grouped = df.groupby('st_dt')
     days =[ (key, group.reset_index(drop=True)) for key, group in grouped]
 
-
     all_days =[]
 
     for (st_dt, df) in days:
-        del df['st_dt']
-        del df['return5']
-        del df['return1']
-        del df['m_diff']
-        del df['open']
-        del df['high']
-        del df['low']
-        price = df['transaction']
-        del df['transaction']
+        price = df[target]
+        df =df.drop(columns=trim)
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
         base = base.drop(columns=['st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
         all_days.append(Day(st_dt, df.to_numpy(), price.to_numpy(), base.to_numpy()[0]))
-
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
     feature_size = len(df.columns)
     base_size = len(base.columns)
@@ -199,15 +190,25 @@ def load():
     print(all_days[-1].base)
     return all_days, feature_size, base_size
 
+def load():
+    return _load('transaction'
+                 , ['transaction', 'st_dt','return5' , 'return1','m_diff' , 'open','high' , 'low'])
+
+def load_ml():
+    all_days, feature_size, _load('return1'
+                 , ['transaction', 'st_dt','return5' , 'return1','m_diff' , 'open','high' , 'low'])
+    TRAIN, _, TEST = split(all_days)
+    return TRAIN, TEST
+
 def split(all_days):
-    # idxes = list(range(len(all_days)))
-    # e_day = idxes[-3:]
+    idxes = list(range(len(all_days)))
+    # e_day = idxes[-5:]
     # extra = [3,10,14,17]
     # e_day = list(set(extra+e_day))
     # t_day = [i for i in idxes if i not in e_day]
 
-    t_day = [8, 9,10,11, 12, 13, 14]
-    e_day = [14, 15, 16]
+    e_day = idxes[-8:-2]
+    t_day = idxes[:-5]
     print("TAIN ON:",t_day)
     print("TEST ON:", e_day)
 
@@ -217,7 +218,7 @@ def split(all_days):
 
 
 if __name__ == '__main__':
-    load()
+    load_ml()
 else:
     all_days, feature_size, base_size = load()
     TRAIN, TRAIN_DAYS, TEST = split(all_days)

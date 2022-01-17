@@ -21,7 +21,7 @@ class BaseFeature(BaseFeaturesExtractor):
 class SeqFeature(BaseFeaturesExtractor):
     def __init__(self, obs_space: gym.spaces.Box):
         super (SeqFeature, self).__init__ (obs_space, features_dim=1)
-        extractors =[ SeqCRNN(obs_space, 32), SeqLstm(obs_space,32), SeqLast(obs_space)]
+        extractors =[ SeqCRNN(obs_space, 32), SeqLast(obs_space)]
         total_concat_size = 0
         for ex in extractors:
             total_concat_size += ex._features_dim
