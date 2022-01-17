@@ -30,8 +30,8 @@ def ta_idx(df):
          ta['vMA5'] = tb.MA(v, timeperiod=5) / np.nanmean(tb.MA(v, timeperiod=5))
          ta['vMA10'] = tb.MA(v, timeperiod=10) / np.nanmean(tb.MA(v, timeperiod=10))
 
-         # ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
-         # ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
+         ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
+         ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
          ta['ADX'] = tb.ADX(h, l, c, timeperiod=14) / np.nanmean(tb.ADX(h, l, c, timeperiod=14))
          ta['ADXR'] = tb.ADXR(h, l, c, timeperiod=14) / np.nanmean(tb.ADXR(h, l, c, timeperiod=14))
          ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
@@ -141,7 +141,7 @@ def save():
     print("-------------ADJ---------------")
     print(adj_df.head(3))
 
-Day = namedtuple('day', ['dt', 'data', 'price', 'base'])
+Day = namedtuple('day', ['dt', 'data', 'ta', 'price', 'base'])
 def load_ori():
     ql = "select * from data_19_28"
     df = pd.read_sql_query (ql, conn)
@@ -177,7 +177,14 @@ def _load(target, trim ):
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
         base = base.drop(columns=[ 'st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
-        all_days.append(Day(st_dt, df.to_numpy().astype(np.float32)
+        obs_cols = [ 'open','high' , 'low','mm', 'close', 'volume', 'HL']
+        ta_cols = [i for i in df.columns if i not in obs_cols]
+
+        obs = df[obs_cols]
+        ta = df[ta_cols]
+
+        all_days.append(Day(st_dt, obs.to_numpy().astype(np.float32)
+                            , ta.to_numpy().astype(np.float32)
                             , price.to_numpy().astype(np.float32)
                             , base.to_numpy().astype(np.float32)[0]))
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
@@ -185,17 +192,19 @@ def _load(target, trim ):
     base_size = len(base.columns)
 
     print(feature_size, base_size)
-    print("-----DATA")
-    print(df.head(3))
+    print("-----OBS")
+    print(obs.head(2))
+    print("-----TA")
+    print(ta.head(2))
     print("-----BASE")
     print(base.head())
     print("-----PRICE")
-    print(price.head(3))
+    print(price.head(2))
     return all_days, feature_size, base_size
 
 def load_ml():
     all_days, feature_size, base_size = _load('return1'
-                 , ['st_dt', 'transaction','return1', 'return5','m_diff' , 'open','high' , 'low'])
+                 , ['st_dt', 'transaction','return1', 'return5','m_diff' ])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 
@@ -223,7 +232,7 @@ def split(all_days):
 
 
 if __name__ == '__main__':
-    load_ml()
+    save()
 
 
 

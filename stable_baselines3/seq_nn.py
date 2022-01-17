@@ -21,7 +21,7 @@ class BaseFeature(BaseFeaturesExtractor):
 class SeqFeature(BaseFeaturesExtractor):
     def __init__(self, obs_space: gym.spaces.Box):
         super (SeqFeature, self).__init__ (obs_space, features_dim=1)
-        extractors =[ SeqCRNN(obs_space, 64), SeqLstm(obs_space)]
+        extractors =[ SeqCRNN(obs_space, 64)]
         total_concat_size = 0
         for ex in extractors:
             total_concat_size += ex._features_dim
@@ -66,7 +66,7 @@ class SeqLast(BaseFeaturesExtractor):
         return self.flatten (observations[:,-1])
 
 class LstmLast(nn.Module):
-    def __init__(self, seq_width, hidden, dropout=0):
+    def __init__(self, seq_width, hidden):
         super (LstmLast, self).__init__ ()
         self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
     def forward(self, x):
@@ -76,9 +76,10 @@ class LstmLast(nn.Module):
 
 
 class SeqCRNN (BaseFeaturesExtractor):
-    ch1 = 5
-    def __init__(self, observation_space: gym.spaces.Box, outdim: int = 64, span=3):
-        super (SeqCRNN, self).__init__ (observation_space, features_dim=outdim)
+    ch1 = 3
+    ch2= 5
+    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64, span=3):
+        super (SeqCRNN, self).__init__ (observation_space, features_dim=out_dim)
         seq_len = observation_space.shape[0]
         seq_width = observation_space.shape[1]
         span = min (seq_len, span)
@@ -87,18 +88,24 @@ class SeqCRNN (BaseFeaturesExtractor):
 
         self.crnn = nn.Sequential (
             nn.Unflatten (-2, (1, seq_len)),
-            nn.Conv2d (1, self.ch1, kernel_size=(span, 1)),
+            nn.Conv2d (1, self.ch1, kernel_size=(span, 1), bias=False),
+            nn.BatchNorm2d(self.ch1),
             nn.Dropout(0.2),
             nn.ReLU (),
-            nn.Conv2d (self.ch1, 1, kernel_size=(1, 1)),
+            nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), bias=False),
+            nn.BatchNorm2d(self.ch2),
+            nn.ReLU(),
+            nn.Conv2d (self.ch2, 1, kernel_size=(1, 1), bias=False),
+            nn.BatchNorm2d(1),
             nn.Dropout(0.2),
             nn.Flatten (end_dim=-2),
-            LstmLast (seq_width=seq_width, hidden=outdim),
+            LstmLast (seq_width=seq_width, hidden=out_dim),
             nn.Dropout(0.2),
             nn.ReLU ()
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
+
         return self.crnn(observations)
 
 

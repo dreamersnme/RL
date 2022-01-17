@@ -52,7 +52,7 @@ def val(model, dataset):
 eval_interval = 5
 def train(data, testdata, validdatae):
     train_loader = DataLoader(data, batch_size=batch_size, pin_memory=True, shuffle= True)
-    model = OutterModel(data.feature_len, data.seq, data.base_len).to(device)
+    model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)
     model.train()
 
     rmse = RMSELoss().to(device)

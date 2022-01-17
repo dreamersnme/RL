@@ -9,14 +9,17 @@ from SOL import extractor
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
 TARGET ="target"
+TA ='ta'
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    def __init__(self, data, normalizer = None, seq = 20):
+    def __init__(self, data, normalizer = None, seq = 10, ta_seq = 5):
         self.data = data
         self.day_cnt = len(data)
         self.target = [d.price.reshape(-1,1) for d in data]
         self.seq = seq
+        self.ta_seq = ta_seq
         self.feature_len = self.data[0].data.shape[1]
+        self.ta_len = self.data[0].ta.shape[1]
         self.base_len = self.data[0].base.shape[0]
 
         self.daily_size = [day.data.shape[0] - seq+1 for day in self.data]
@@ -26,16 +29,18 @@ class DLoader(Dataset):
 
     def _get_normalizer(self):
         obsN = RunningMeanStd(shape=(self.seq, self.feature_len))
+        taN = RunningMeanStd(shape=(self.ta_seq, self.ta_len))
         baseN = RunningMeanStd(shape=(self.base_len,))
         targetN = RunningMeanStd(shape=(1,))
 
         for idx in range(self.__len__()):
-            obs, base, target = self.__getitem(idx)
+            obs, ta, base, target = self.__getitem(idx)
             obsN.update(obs)
+            taN.update(ta)
             baseN.update(base)
             targetN.update(target)
 
-        return {OBS: obsN, BASE:baseN, TARGET:targetN}
+        return {OBS: obsN, TA:taN, BASE:baseN, TARGET:targetN}
 
     def day_search(self, idx):
         left = 0
@@ -68,12 +73,15 @@ class DLoader(Dataset):
         s_idx = idx
         e_idx = idx+self.seq-1
         obs = day.data[s_idx: e_idx+1]
-        return obs, day.base, self.target[day_no][e_idx]
+        ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
+        return obs, ta, day.base, self.target[day_no][e_idx]
 
     def __getitem__(self, idx):
-        obs, base, target = self.__getitem(idx)
+        obs, ta, base, target = self.__getitem(idx)
         return ({OBS:self.normalize(OBS,obs)
-                    ,BASE:self.normalize(BASE,base)}, self.normalize(TARGET,target))
+                    ,TA:self.normalize(TA, ta)
+                    ,BASE:self.normalize(BASE,base)}
+                , self.normalize(TARGET,target))
 
     def __len__(self):
         return self.daily_idx[-1]
