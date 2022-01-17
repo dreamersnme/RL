@@ -24,6 +24,7 @@ keys/
 # Virtualenv
 /env
 /venv
+/sFig
 
 
 *.sublime-project
