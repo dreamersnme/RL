@@ -50,9 +50,11 @@ class SeqCNN (BaseFeaturesExtractor):
         self.cnn = nn.Sequential (
             nn.Unflatten(-2, (1,seq_len)),
             nn.Conv2d (1, self.ch1, kernel_size=(span, 1), stride=1),
+            nn.BatchNorm2d(self.ch1),
             nn.Mish(),
             nn.Dropout(0.2),
             nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), stride=1),
+            nn.BatchNorm2d(self.ch2),
             nn.Mish(),
             nn.Flatten (),
             nn.Linear (n_cnn, outdim),
