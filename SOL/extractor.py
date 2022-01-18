@@ -75,7 +75,7 @@ def get_dt_base(df_o):
 
 
 def get_base():
-    ql = "select * from min_CLK20 where st_dt between '20200309' and '20200403'"
+    ql = "select * from min_CLK20 where st_dt between '20200209' and '20200403'"
     df_o = pd.read_sql_query (ql, conn)
     df_o['tm_key'] = pd.to_datetime (df_o.tm_key)
     del df_o['dt']
@@ -203,8 +203,8 @@ def _load(target, trim ):
     return all_days, feature_size, base_size
 
 def load_ml():
-    all_days, feature_size, base_size = _load('return5'
-                 , ['st_dt', 'transaction','return1', 'return5','m_diff' ])
+    all_days, feature_size, base_size = _load('return1'
+                 , ['st_dt','return1', 'return5','m_diff' ])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 
