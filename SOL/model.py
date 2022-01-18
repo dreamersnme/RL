@@ -11,6 +11,7 @@ from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN
 
 
+
 class RMSELoss(nn.Module):
     def __init__(self):
         super(RMSELoss,self).__init__()
@@ -29,10 +30,9 @@ class CombinedModel(nn.Module):
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
 
-        extractors = {OBS:  SeqCRNN(self.observation_space.spaces[OBS],out_dim=32)
-                        , 'obs2': SeqLstm(self.observation_space.spaces[OBS], out_dim=32)
-                      , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=32)
-                    , BASE: BaseFeature(self.observation_space[BASE])}
+        extractors = {OBS:  SeqLstm(self.observation_space.spaces[OBS],out_dim=16)
+                      , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=16)
+                    , BASE: BaseFeature(self.observation_space[BASE],  out_dim=8)}
 
         total_concat_size = sum([module.features_dim for module in extractors.values()])
         self.extractors = nn.ModuleDict(extractors)
@@ -41,8 +41,7 @@ class CombinedModel(nn.Module):
     def forward(self, observations: TensorDict) -> th.Tensor:
         encoded_tensor_list = []
         for key, extractor in self.extractors.items():
-            if key == 'obs2':encoded_tensor_list.append(extractor(observations[OBS]))
-            else: encoded_tensor_list.append(extractor(observations[key]))
+            encoded_tensor_list.append(extractor(observations[key]))
         return th.cat(encoded_tensor_list, dim=1)
 
 class OutterModel(nn.Module):
@@ -51,9 +50,13 @@ class OutterModel(nn.Module):
         self.module = CombinedModel( feature_length, seq, ta_len, ta_seq, base_len)
         dim1 = self.module.features_dim
         dim2= int(dim1/2)
+
+
         self.agg = nn.Sequential(
             nn.Linear(dim1, dim2),
-            nn.ReLU(),
+            nn.BatchNorm1d(dim2),
+            nn.Mish(),
+            nn.Dropout (0.2),
             nn.Linear(dim2, 1)
         )
     def forward(self, observations: TensorDict) -> th.Tensor:
