@@ -4,6 +4,8 @@ import torch as th
 from torch import nn
 
 from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
+
+
 class BaseFeature(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.Space, out_dim=16):
         super(BaseFeature, self).__init__(observation_space, features_dim=out_dim)
@@ -68,6 +70,7 @@ class SeqLast(BaseFeaturesExtractor):
 class LstmLast(nn.Module):
     def __init__(self, seq_width, hidden):
         super (LstmLast, self).__init__ ()
+        # self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
         self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
     def forward(self, x):
         out, _ = self.lstm(x)
@@ -116,7 +119,7 @@ class SeqLstm (BaseFeaturesExtractor):
         # self.lstm = LstmLast(seq_width=seq_width, hidden=hidden)
         self.lstm = nn.Sequential(
             LstmLast (seq_width=seq_width, hidden=out_dim),
-            nn.ReLU (),
+            nn.Mish(),
             nn.Dropout(0.2)
         )
 
