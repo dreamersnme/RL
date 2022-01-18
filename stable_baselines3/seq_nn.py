@@ -45,7 +45,7 @@ class SeqCNN (BaseFeaturesExtractor):
         seq_len = observation_space.shape[0]
         seq_width = observation_space.shape[1]
         span = min (seq_len, span)
-        n_cnn = (seq_len - span +1) * seq_width * self.ch2
+        n_cnn = (seq_len - 2*span +2*1) * seq_width * self.ch2
 
         self.cnn = nn.Sequential (
             nn.Unflatten(-2, (1,seq_len)),
