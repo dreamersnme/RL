@@ -38,7 +38,8 @@ class SeqFeature(BaseFeaturesExtractor):
         return th.cat(encoded_tensor_list, dim=1)
 
 class SeqCNN (BaseFeaturesExtractor):
-    ch1 = 4
+    ch1 = 7
+    ch1 = 3
     def __init__(self, observation_space: gym.spaces.Box, span=3, outdim: int = 64):
         super (SeqCNN, self).__init__ (observation_space, features_dim=outdim)
         seq_len = observation_space.shape[0]
@@ -49,6 +50,9 @@ class SeqCNN (BaseFeaturesExtractor):
         self.cnn = nn.Sequential (
             nn.Unflatten(-2, (1,seq_len)),
             nn.Conv2d (1, self.ch1, kernel_size=(span, 1), stride=1),
+            nn.Mish(),
+            nn.Dropout(0.2),
+            nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), stride=1),
             nn.Mish(),
             nn.Flatten (),
             nn.Linear (n_cnn, outdim),

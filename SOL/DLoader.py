@@ -21,7 +21,6 @@ class DLoader(Dataset):
         self.feature_len = self.data[0].data.shape[1]
         self.ta_len = self.data[0].ta.shape[1]
         self.base_len = self.data[0].base.shape[0]
-
         self.daily_size = [day.data.shape[0] - seq+1 for day in self.data]
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
         self.normalizer = normalizer
