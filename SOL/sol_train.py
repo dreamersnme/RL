@@ -15,7 +15,7 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.001
+learning_rate = 0.005
 batch_size = 128
 num_classes = 10
 epochs = 10000
@@ -44,7 +44,6 @@ def val(model, dataset):
             abs = dataset.abs_diff(pred, target)
             sum +=np.sum(abs)
         print('Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
-
     model.train()
 
 
