@@ -8,8 +8,7 @@ from gym import spaces
 from CONFIG import *
 from SOL.DLoader import TA
 from stable_baselines3.common.type_aliases import TensorDict
-from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN
-
+from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN, SeqCNN
 
 
 class RMSELoss(nn.Module):
@@ -20,6 +19,19 @@ class RMSELoss(nn.Module):
         loss = th.sqrt(criterion(x, y))
         return loss
 
+class ObsNN(nn.Module):
+    def __init__(self, space):
+        super(ObsNN,self).__init__()
+        lstm_dim = 16
+        crnn_dim = 16
+        self.features_dim = lstm_dim +crnn_dim
+        self.lstm = SeqLstm(space, out_dim=16)
+        self.cnn = SeqCNN(space, outdim=16)
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return th.cat([self.lstm(observations),self.cnn(observations)], dim=1)
+
+
 class CombinedModel(nn.Module):
     def __init__(self, feature_length, seq, ta_len, ta_seq, base_len):
 
@@ -29,10 +41,9 @@ class CombinedModel(nn.Module):
         base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
-
-        extractors = {OBS:  SeqLstm(self.observation_space.spaces[OBS],out_dim=16)
-                      , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=16)
-                    , BASE: BaseFeature(self.observation_space[BASE],  out_dim=8)}
+        extractors = {OBS: ObsNN(self.observation_space.spaces[OBS])
+            , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=16)
+            , BASE: BaseFeature(self.observation_space[BASE], out_dim=8)}
 
         total_concat_size = sum([module.features_dim for module in extractors.values()])
         self.extractors = nn.ModuleDict(extractors)

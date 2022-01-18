@@ -49,10 +49,10 @@ class SeqCNN (BaseFeaturesExtractor):
         self.cnn = nn.Sequential (
             nn.Unflatten(-2, (1,seq_len)),
             nn.Conv2d (1, self.ch1, kernel_size=(span, 1), stride=1),
-            nn.ReLU(),
+            nn.Mish(),
             nn.Flatten (),
             nn.Linear (n_cnn, outdim),
-            nn.ReLU ()
+            nn.Mish ()
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
@@ -70,8 +70,8 @@ class SeqLast(BaseFeaturesExtractor):
 class LstmLast(nn.Module):
     def __init__(self, seq_width, hidden):
         super (LstmLast, self).__init__ ()
-        # self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
-        self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
+        self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
+        # self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
     def forward(self, x):
         out, _ = self.lstm(x)
         return out[:,-1]
@@ -94,7 +94,7 @@ class SeqCRNN (BaseFeaturesExtractor):
             nn.Conv2d (1, self.ch1, kernel_size=(span, 1), bias=False),
             nn.BatchNorm2d(self.ch1),
             nn.Dropout(0.2),
-            nn.ReLU (),
+            nn.Mish (),
             nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), bias=False),
             nn.BatchNorm2d(self.ch2),
             nn.ReLU(),
@@ -116,7 +116,6 @@ class SeqLstm (BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
         super (SeqLstm, self).__init__ (observation_space, features_dim=out_dim)
         seq_width = observation_space.shape[1]
-        # self.lstm = LstmLast(seq_width=seq_width, hidden=hidden)
         self.lstm = nn.Sequential(
             LstmLast (seq_width=seq_width, hidden=out_dim),
             nn.Mish(),
