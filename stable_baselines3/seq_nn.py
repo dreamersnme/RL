@@ -39,7 +39,7 @@ class SeqFeature(BaseFeaturesExtractor):
 
 class SeqCNN (BaseFeaturesExtractor):
     ch1 = 7
-    ch1 = 3
+    ch3 = 3
     def __init__(self, observation_space: gym.spaces.Box, span=3, outdim: int = 64):
         super (SeqCNN, self).__init__ (observation_space, features_dim=outdim)
         seq_len = observation_space.shape[0]
