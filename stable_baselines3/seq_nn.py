@@ -47,6 +47,7 @@ class SeqCNN (BaseFeaturesExtractor):
         span = min (seq_len, span)
         n_cnn = (seq_len - 2*span +2*1) * seq_width * self.ch2
 
+
         self.cnn = nn.Sequential (
             nn.Unflatten(-2, (1,seq_len)),
             nn.Conv2d (1, self.ch1, kernel_size=(span, 1), stride=1),
