@@ -203,7 +203,7 @@ def _load(target, trim ):
     return all_days, feature_size, base_size
 
 def load_ml():
-    all_days, feature_size, base_size = _load('return1'
+    all_days, feature_size, base_size = _load('return5'
                  , ['st_dt', 'transaction','return1', 'return5','m_diff' ])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
@@ -220,9 +220,8 @@ def split(all_days):
     # extra = [3,10,14,17]
     # e_day = list(set(extra+e_day))
     # t_day = [i for i in idxes if i not in e_day]
-
-    e_day = idxes[-8:]
     t_day = idxes[:-5]
+    e_day = idxes[-8:]
     print("TAIN ON:",t_day)
     print("TEST ON:", e_day)
 
