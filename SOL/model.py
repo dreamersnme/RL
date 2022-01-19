@@ -41,7 +41,7 @@ class CombinedModel(nn.Module):
         base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
-        extractors = {OBS: ObsNN(self.observation_space.spaces[OBS])
+        extractors = {OBS: SeqCNN(self.observation_space.spaces[OBS])
             , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=16)
             , BASE: BaseFeature(self.observation_space[BASE], out_dim=8)}
 
