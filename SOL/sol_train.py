@@ -31,19 +31,56 @@ def obs_as_tensor(
     else:
         raise Exception(f"Unrecognized type of observation {type(obs)}")
 
+# def val(model, dataset):
+#     model.eval()
+#     test_loader = DataLoader(dataset, batch_size=128)
+#     with th.no_grad():
+#         sum = 0
+#         for data, target in test_loader:
+#             data = obs_as_tensor(data, device)
+#             pred = model(data).cpu().numpy()
+#             target = target.numpy()
+#             abs = dataset.abs_diff(pred, target)
+#             sum +=np.sum(abs)
+#         print('Eval diff  = {:>.4}'.format(sum/dataset.__len__()))
+#     model.train()
+
+threhold = 0.6
+def triger(price, direct):
+    direct = direct[:0]
+    index = np.where( (direct < -threhold) | (direct> threhold), 1, 0)
+    print (index)
+
+def trade(pre_p, pre_d, target, normali):
+    tri = triger(pre_p, pre_d)
+    cnt = tri.sum()
+    if cnt == 0: return 0,0
+
+    pred = normali(pre_p)
+
+
+
+
+
+
+
+
 def val(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=128)
+    test_loader = DataLoader(dataset, batch_size=2)
     with th.no_grad():
         sum = 0
-
-        for data, target in test_loader:
+        pre_cnt = 0
+        for data, target, direct in test_loader:
             data = obs_as_tensor(data, device)
             pred = model(data).cpu().numpy()
-            target = target.numpy()
-            abs = dataset.abs_diff(pred, target)
-            sum +=np.sum(abs)
-        print('Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
+            pre_p, pre_d = pred[:,0:1], pred[:,1:2]
+            diff, cnt = trade(pre_p, pre_d, target.numpy(), dataset.denorm_target)
+            sum +=diff
+            pre_cnt +=cnt
+        if pre_cnt ==0:
+            print ('Eval no')
+        else: print('Eval diff  = {:>.6}, cnt{}/{}'.format(sum/pre_cnt, pre_cnt, dataset.__len__()))
     model.train()
 
 
@@ -54,14 +91,16 @@ def train(data, testdata, validdatae):
     model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)
     model.train()
 
-    rmse = RMSELoss().to(device)
+    rmse = nn.MSELoss().to(device)
     optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-5)
 
     for epoch in range(epochs):  # epochs수만큼 반복
         avg_loss = 0
-        for data, target in train_loader:
+        for data, target, direction in train_loader:
             data = obs_as_tensor(data, device)
             target = obs_as_tensor(target, device)
+            direction = obs_as_tensor (direction, device)
+            target = th.cat([target, direction], dim=1)
             optimizer.zero_grad()
             hypothesis = model(data)
             loss = rmse(hypothesis, target)
