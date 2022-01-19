@@ -12,9 +12,12 @@ TARGET ="target"
 TA ='ta'
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    def __init__(self, data, normalizer = None, seq = 3, ta_seq = 2):
+    thresold = 0.06
+
+    def __init__(self, data, normalizer = None, seq = 5, ta_seq = 5):
         self.data = data
         self.day_cnt = len(data)
+        self.target2 = [self.direction(d.price) for d in data]
         self.target = [d.price.reshape(-1,1) for d in data]
         self.seq = seq
         self.ta_seq = ta_seq
@@ -26,6 +29,17 @@ class DLoader(Dataset):
         self.normalizer = normalizer
         if normalizer is None: self.normalizer = self._get_normalizer()
 
+
+    def direction(self, price):
+        price
+        surge = []
+        for p in price:
+            if p <= -self.thresold: index = -1
+            elif p>=self.thresold: index = 1
+            else: index = 0
+            surge.append([index])
+        return np.array(surge)
+
     def _get_normalizer(self):
         obsN = RunningMeanStd(shape=(self.seq, self.feature_len))
         taN = RunningMeanStd(shape=(self.ta_seq, self.ta_len))
@@ -33,7 +47,7 @@ class DLoader(Dataset):
         targetN = RunningMeanStd(shape=(1,))
 
         for idx in range(self.__len__()):
-            obs, ta, base, target = self.__getitem(idx)
+            obs, ta, base, target,_ = self.__getitem(idx)
             obsN.update(obs)
             taN.update(ta)
             baseN.update(base)
@@ -53,17 +67,15 @@ class DLoader(Dataset):
 
     def normalize(self, key, obs):
         obs_rms = self.normalizer[key]
-        return ((obs - obs_rms.mean) / np.sqrt(obs_rms.var + self.epsilon) ).astype(np.float32)
+        return ((obs - obs_rms.mean) / np.sqrt(obs_rms.var + self.epsilon)).astype(np.float32)
+
+    def denorm_target(self, target):
+        obs_rms = self.normalizer[TARGET]
+        return (target * np.sqrt (obs_rms.var + self.epsilon)) + obs_rms.mean
 
 
     def abs_diff(self, pred, true):
-        obs_rms = self.normalizer[TARGET]
-        pred =  (pred * np.sqrt(obs_rms.var + self.epsilon)) + obs_rms.mean
-        true = (true * np.sqrt(obs_rms.var + self.epsilon)) + obs_rms.mean
-        return np.abs(pred-true)
-
-
-
+        return np.abs(self.denorm_target(pred)- self.denorm_target(true))
 
     def __getitem(self, idx):
         if idx >= self.daily_idx[-1]: raise IndexError(idx)
@@ -73,14 +85,14 @@ class DLoader(Dataset):
         e_idx = idx+self.seq-1
         obs = day.data[s_idx: e_idx+1]
         ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
-        return obs, ta, day.base, self.target[day_no][e_idx]
+        return obs, ta, day.base, self.target[day_no][e_idx], self.target[day_no][e_idx]
 
     def __getitem__(self, idx):
-        obs, ta, base, target = self.__getitem(idx)
+        obs, ta, base, target, target2 = self.__getitem(idx)
         return ({OBS:self.normalize(OBS,obs)
                     ,TA:self.normalize(TA, ta)
                     ,BASE:self.normalize(BASE,base)}
-                , self.normalize(TARGET,target))
+                , self.normalize(TARGET,target), target2)
 
     def __len__(self):
         return self.daily_idx[-1]
