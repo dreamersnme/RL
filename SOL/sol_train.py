@@ -48,7 +48,7 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     same_direct =  p_d - p_p
     same_direct = np.where(same_direct != 0)[0].shape[0]
 
-    pre_d = unit(pre_d, 0.1)
+    pre_d = unit(pre_d, 0.33)
     tri = np.abs(pre_d)
     cnt = tri.sum()
 
@@ -57,7 +57,7 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     if cnt > 0:
         tru = denormali(target)[:, 0]
 
-        cor_direct = np.where(unit(tru) == pre_d, 1, 0)
+        cor_direct = np.where(unit(tru, 0.01) == pre_d, 1, 0)
         correct = np.sum(cor_direct *tri )
 
         diff = (pre_p - tru) * tri

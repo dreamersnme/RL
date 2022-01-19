@@ -75,7 +75,7 @@ def get_dt_base(df_o):
 
 
 def get_base():
-    ql = "select * from min_CLK20 where st_dt between '202002015' and '20200403'"
+    ql = "select * from min_CLK20 where st_dt between '20200215' and '20200403'"
     df_o = pd.read_sql_query (ql, conn)
     df_o['tm_key'] = pd.to_datetime (df_o.tm_key)
     del df_o['dt']
