@@ -204,7 +204,7 @@ def _load(target, trim ):
 
 def load_ml():
     all_days, feature_size, base_size = _load('return1'
-                 , ['st_dt','return1', 'return5','m_diff' ])
+                 , ['st_dt','return1','transaction', 'return5','m_diff' ])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 

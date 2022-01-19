@@ -28,6 +28,7 @@ class DLoader(Dataset):
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
         self.normalizer = normalizer
         if normalizer is None: self.normalizer = self._get_normalizer()
+        else: self._get_normalizer()
 
 
     def direction(self, price):
@@ -46,12 +47,17 @@ class DLoader(Dataset):
         baseN = RunningMeanStd(shape=(self.base_len,))
         targetN = RunningMeanStd(shape=(1,))
 
+        self.neg_direct = 0
+        self.pos_direct = 0
         for idx in range(self.__len__()):
-            obs, ta, base, target,_ = self.__getitem(idx)
+            obs, ta, base, target,direct = self.__getitem(idx)
             obsN.update(obs)
             taN.update(ta)
             baseN.update(base)
             targetN.update(target)
+            if direct >0: self.pos_direct +=1
+            elif direct <0: self.neg_direct +=1
+            else:pass
 
         return {OBS: obsN, TA:taN, BASE:baseN, TARGET:targetN}
 
@@ -85,7 +91,7 @@ class DLoader(Dataset):
         e_idx = idx+self.seq-1
         obs = day.data[s_idx: e_idx+1]
         ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
-        return obs, ta, day.base, self.target[day_no][e_idx], self.target[day_no][e_idx]
+        return obs, ta, day.base, self.target[day_no][e_idx], self.target2[day_no][e_idx]
 
     def __getitem__(self, idx):
         obs, ta, base, target, target2 = self.__getitem(idx)

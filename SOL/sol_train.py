@@ -1,5 +1,6 @@
 from typing import Dict, Union
 
+import numpy as np
 import torch as th
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -45,42 +46,61 @@ def obs_as_tensor(
 #         print('Eval diff  = {:>.4}'.format(sum/dataset.__len__()))
 #     model.train()
 
-threhold = 0.6
-def triger(price, direct):
-    direct = direct[:0]
-    index = np.where( (direct < -threhold) | (direct> threhold), 1, 0)
-    print (index)
 
-def trade(pre_p, pre_d, target, normali):
-    tri = triger(pre_p, pre_d)
+def unit(arr, thre = 0.001):
+    plus = np.where(arr > thre, 1, 0)
+    minus = np.where(arr < -thre, -1, 0)
+    return plus + minus
+
+
+def trade(pre_p, pre_d, target, denormali, tru_direct):
+    pre_d = pre_d[:, 0]
+    pre_p = denormali(pre_p)[:, 0]
+    p_d = unit(pre_d)
+    p_p = unit(pre_p)
+    same_direct =  p_d - p_p
+    same_direct = np.where(same_direct != 0)[0].shape[0]
+
+    pre_d = unit(pre_d, 0.5)
+    tri = np.abs(pre_d)
     cnt = tri.sum()
-    if cnt == 0: return 0,0
 
-    pred = normali(pre_p)
+    diff=0
+    correct =0
+    if cnt > 0:
+        # tru_direct = tru_direct[:,0].numpy()
+        cor_direct = np.where(unit(pre_p,0.03) == pre_d, 1, 0)
 
-
-
-
-
-
+        correct = np.sum(cor_direct * tri)
+        diff = (pre_p - denormali(target)[:,0]) * tri
+        diff = np.sum(np.abs(diff))
+    return diff, cnt, correct, same_direct
 
 
 def val(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=2)
+    test_loader = DataLoader(dataset, batch_size=1000)
     with th.no_grad():
         sum = 0
         pre_cnt = 0
+        cor_d_cnt = 0
+        same_direct = 0
         for data, target, direct in test_loader:
             data = obs_as_tensor(data, device)
             pred = model(data).cpu().numpy()
             pre_p, pre_d = pred[:,0:1], pred[:,1:2]
-            diff, cnt = trade(pre_p, pre_d, target.numpy(), dataset.denorm_target)
-            sum +=diff
+
+            diff, cnt, correct, pre_same = trade(pre_p, pre_d, target.numpy(), dataset.denorm_target, direct)
+            sum += diff
             pre_cnt +=cnt
+            cor_d_cnt += correct
+            same_direct += pre_same
+
+
         if pre_cnt ==0:
-            print ('Eval no')
-        else: print('Eval diff  = {:>.6}, cnt{}/{}'.format(sum/pre_cnt, pre_cnt, dataset.__len__()))
+            print('Eval No cnt: {}(p{}, n{})  ---  Pre_X: {})'.format(dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
+        else: print('Eval diff  = {:>.6}, cnt: {}({})/{}(p{}, n{})  ---   Pre_X: {})'.format(
+            sum/pre_cnt, pre_cnt, cor_d_cnt, dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
     model.train()
 
 
@@ -110,9 +130,8 @@ def train(data, testdata, validdatae):
 
         if (epoch +1)%eval_interval ==0:
             print('[Epoch: {:>4}] loss = {:>.9}'.format(epoch + 1, avg_loss))
-            print("==== TEST ===")
+            print("==== VALID (overlap, all) ===")
             val(model, testdata)
-            print("==== VALID ===")
             val(model, validdatae)
 
     # test
