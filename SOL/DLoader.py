@@ -14,7 +14,7 @@ class DLoader(Dataset):
     epsilon: float = 1e-8
     thresold = 0.06
 
-    def __init__(self, data, normalizer = None, seq = 5, ta_seq = 5):
+    def __init__(self, data, normalizer = None, seq = 15, ta_seq = 10):
         self.data = data
         self.day_cnt = len(data)
         self.neg_direct = 0

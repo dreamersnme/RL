@@ -22,14 +22,15 @@ class RMSELoss(nn.Module):
 class ObsNN(nn.Module):
     def __init__(self, space):
         super(ObsNN,self).__init__()
-        lstm_dim = 32
-        crnn_dim = 16
-        self.features_dim = lstm_dim +crnn_dim
-        self.lstm = SeqLstm(space, out_dim=lstm_dim)
-        self.cnn = SeqCNN(space, outdim=crnn_dim)
+        outdim = 16
+
+        self.features_dim = outdim *3
+        self.lstm = SeqLstm(space, out_dim=outdim)
+        self.crnn = SeqCRNN(space, out_dim=outdim)
+        self.cnn = SeqCNN(space, out_dim=outdim)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return th.cat([self.lstm(observations),self.cnn(observations)], dim=1)
+        return th.cat([self.lstm(observations),self.cnn(observations), self.crnn(observations)], dim=1)
 
 
 class CombinedModel(nn.Module):
@@ -42,7 +43,7 @@ class CombinedModel(nn.Module):
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
         extractors = {OBS: ObsNN(self.observation_space.spaces[OBS])
-            , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=32)
+            , TA: ObsNN(self.observation_space.spaces[TA])
             , BASE: BaseFeature(self.observation_space[BASE], out_dim=4)}
 
         total_concat_size = sum([module.features_dim for module in extractors.values()])

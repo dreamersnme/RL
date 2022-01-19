@@ -39,6 +39,11 @@ def unit(arr, thre = 0.001):
     minus = np.where(arr < -thre, -1, 0)
     return plus + minus
 
+def trigger(pre_d, pre_p):
+    direct = unit(pre_d, 0.33)
+    price_direct = unit(pre_p, 0.02)
+    return ((direct + price_direct)/2).astype(int)
+
 
 def trade(pre_p, pre_d, target, denormali, tru_direct):
     pre_d = pre_d[:, 0]
@@ -48,7 +53,7 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     same_direct =  p_d - p_p
     same_direct = np.where(same_direct != 0)[0].shape[0]
 
-    pre_d = unit(pre_d, 0.33)
+    pre_d = trigger(pre_d, pre_p)
     tri = np.abs(pre_d)
     cnt = tri.sum()
 
@@ -56,20 +61,10 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     correct =0
     if cnt > 0:
         tru = denormali(target)[:, 0]
-
-        cor_direct = np.where(unit(tru, 0.01) == pre_d, 1, 0)
-        correct = np.sum(cor_direct *tri )
+        cor_direct = np.where(unit(tru, 0.005) == pre_d, 1, 0)
+        correct = np.sum(cor_direct *tri)
 
         diff = (pre_p - tru) * tri
-        idxes = np.where(diff!=0)[0]
-        # print("---------------------")
-        # print(diff[idxes])
-        # print(pre_p[idxes])
-        # print(tru[idxes])
-        # print(p_p[idxes])
-        # print(pre_d[idxes])
-
-
         diff = np.sum(np.abs(diff))
     return diff, cnt, correct, same_direct
 

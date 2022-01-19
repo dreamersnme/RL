@@ -18,7 +18,23 @@ class BaseFeature(BaseFeaturesExtractor):
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.dense(observations)
 
+class SeqLast(BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.Space):
+        super (SeqLast, self).__init__ (observation_space, observation_space.shape[-1])
+        self.flatten = nn.Flatten ()
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.flatten (observations[:,-1])
 
+
+
+class LstmLast(nn.Module):
+    def __init__(self, seq_width, hidden):
+        super (LstmLast, self).__init__ ()
+        self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
+        # self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return out[:,-1]
 
 class SeqFeature(BaseFeaturesExtractor):
     def __init__(self, obs_space: gym.spaces.Box):
@@ -37,86 +53,48 @@ class SeqFeature(BaseFeaturesExtractor):
             encoded_tensor_list.append(ext(obs))
         return th.cat(encoded_tensor_list, dim=1)
 
+
+class CNN(nn.Module):
+
+    def __init__(self, observation_space: gym.spaces.Box, channels=[5,2], span=3):
+        super (CNN, self).__init__ ()
+        seq_len = observation_space.shape[0]
+        seq_width = observation_space.shape[1]
+
+        span = min (seq_len, span)
+        layer_cnt = len(channels)
+        out_seq_len = (seq_len - layer_cnt*span + layer_cnt)
+        assert out_seq_len > 1
+        self.out_size = out_seq_len * seq_width * channels[-1]
+        self.input = nn.Unflatten(-2, (1, seq_len))
+        cnns = []
+        in_dim = 1
+        for ch in channels:
+            cnns.extend(self.cnn_module(in_dim, ch, span))
+            in_dim = ch
+        self.cnn = nn.Sequential(*cnns)
+
+    def cnn_module(self, inch, outch, span):
+        return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
+            , nn.BatchNorm2d(outch)
+            , nn.Mish()
+            , nn.Dropout(0.2)]
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.cnn(self.input(observations))
+
+
+
 class SeqCNN (BaseFeaturesExtractor):
-    ch1 = 7
-    ch2 = 3
-    def __init__(self, observation_space: gym.spaces.Box, span=3, outdim: int = 64):
-        super (SeqCNN, self).__init__ (observation_space, features_dim=outdim)
-        seq_len = observation_space.shape[0]
-        seq_width = observation_space.shape[1]
-        span = min (seq_len, span)
-        n_cnn = (seq_len - 2*span +2*1) * seq_width * self.ch2
-
-
-        self.cnn = nn.Sequential (
-            nn.Unflatten(-2, (1,seq_len)),
-            nn.Conv2d (1, self.ch1, kernel_size=(span, 1), stride=1),
-            nn.BatchNorm2d(self.ch1),
-            nn.Mish(),
-            nn.Dropout(0.2),
-            nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), stride=1),
-            nn.BatchNorm2d(self.ch2),
-            nn.Mish(),
-            nn.Flatten (),
-            nn.Linear (n_cnn, outdim),
-            nn.Mish ()
-        )
+    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
+        super (SeqCNN, self).__init__ (observation_space, features_dim=out_dim)
+        self.cnn = CNN(observation_space)
+        self.flatten = nn.Sequential (
+            nn.Flatten (), nn.Linear (self.cnn.out_size, out_dim), nn.Mish ())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.cnn(observations)
+        return self.flatten(self.cnn(observations))
 
-
-
-class SeqLast(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.Space):
-        super (SeqLast, self).__init__ (observation_space, observation_space.shape[-1])
-        self.flatten = nn.Flatten ()
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.flatten (observations[:,-1])
-
-class LstmLast(nn.Module):
-    def __init__(self, seq_width, hidden):
-        super (LstmLast, self).__init__ ()
-        self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
-        # self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return out[:,-1]
-
-
-
-class SeqCRNN (BaseFeaturesExtractor):
-    ch1 = 3
-    ch2= 5
-    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64, span=3):
-        super (SeqCRNN, self).__init__ (observation_space, features_dim=out_dim)
-        seq_len = observation_space.shape[0]
-        seq_width = observation_space.shape[1]
-        span = min (seq_len, span)
-        out_len = (seq_len - span +1)
-        assert out_len > 1
-
-        self.crnn = nn.Sequential (
-            nn.Unflatten (-2, (1, seq_len)),
-            nn.Conv2d (1, self.ch1, kernel_size=(span, 1), bias=False),
-            nn.BatchNorm2d(self.ch1),
-            nn.Dropout(0.2),
-            nn.Mish (),
-            nn.Conv2d(self.ch1, self.ch2, kernel_size=(span, 1), bias=False),
-            nn.BatchNorm2d(self.ch2),
-            nn.ReLU(),
-            nn.Conv2d (self.ch2, 1, kernel_size=(1, 1), bias=False),
-            nn.BatchNorm2d(1),
-            nn.Dropout(0.2),
-            nn.Flatten (end_dim=-2),
-            LstmLast (seq_width=seq_width, hidden=out_dim),
-            nn.Dropout(0.2),
-            nn.ReLU ()
-        )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-
-        return self.crnn(observations)
 
 
 class SeqLstm (BaseFeaturesExtractor):
@@ -126,11 +104,24 @@ class SeqLstm (BaseFeaturesExtractor):
         self.lstm = nn.Sequential(
             LstmLast (seq_width=seq_width, hidden=out_dim),
             nn.Mish(),
-            nn.Dropout(0.2)
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.lstm(observations)
+
+class SeqCRNN (BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
+        super (SeqCRNN, self).__init__ (observation_space, features_dim=out_dim)
+        self.cnn = CNN(observation_space)
+        self.rnn = nn.Sequential (
+            nn.Flatten (end_dim=-2),
+            SeqLstm(observation_space, out_dim)
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.rnn(self.cnn(observations))
+
+
 
 
 
