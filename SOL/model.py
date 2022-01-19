@@ -22,11 +22,11 @@ class RMSELoss(nn.Module):
 class ObsNN(nn.Module):
     def __init__(self, space):
         super(ObsNN,self).__init__()
-        lstm_dim = 16
+        lstm_dim = 32
         crnn_dim = 16
         self.features_dim = lstm_dim +crnn_dim
-        self.lstm = SeqLstm(space, out_dim=16)
-        self.cnn = SeqCNN(space, outdim=16)
+        self.lstm = SeqLstm(space, out_dim=lstm_dim)
+        self.cnn = SeqCNN(space, outdim=crnn_dim)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return th.cat([self.lstm(observations),self.cnn(observations)], dim=1)
@@ -41,7 +41,7 @@ class CombinedModel(nn.Module):
         base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
-        extractors = {OBS: SeqLstm(self.observation_space.spaces[OBS], out_dim=32)
+        extractors = {OBS: ObsNN(self.observation_space.spaces[OBS])
             , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=32)
             , BASE: BaseFeature(self.observation_space[BASE], out_dim=4)}
 

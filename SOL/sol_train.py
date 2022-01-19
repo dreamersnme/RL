@@ -19,7 +19,7 @@ if device == 'cuda':
 learning_rate = 0.005
 batch_size = 128
 num_classes = 10
-epochs = 10000
+epochs = 1000
 
 
 def obs_as_tensor(
@@ -55,9 +55,21 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     diff=0
     correct =0
     if cnt > 0:
-        cor_direct = np.where(p_p == pre_d, 1, 0)
+        tru = denormali(target)[:, 0]
+
+        cor_direct = np.where(unit(tru) == pre_d, 1, 0)
         correct = np.sum(cor_direct *tri )
-        diff = (pre_p - denormali(target)[:,0]) * tri
+
+        diff = (pre_p - tru) * tri
+        idxes = np.where(diff!=0)[0]
+        # print("---------------------")
+        # print(diff[idxes])
+        # print(pre_p[idxes])
+        # print(tru[idxes])
+        # print(p_p[idxes])
+        # print(pre_d[idxes])
+
+
         diff = np.sum(np.abs(diff))
     return diff, cnt, correct, same_direct
 
