@@ -62,13 +62,17 @@ class OutterModel(nn.Module):
         dim1 = self.module.features_dim
         dim2= int(dim1/2)
 
-
         self.agg = nn.Sequential(
             nn.Linear(dim1, dim2),
             nn.BatchNorm1d(dim2),
             nn.Mish(),
             nn.Dropout (0.2),
-            nn.Linear(dim2, 1)
         )
+        self.price = nn.Linear (dim2, 1)
+        self.direction =  nn.Sequential(
+            nn.Linear(dim2, 1),
+            nn.Tanh())
+
     def forward(self, observations: TensorDict) -> th.Tensor:
-        return self.agg(self.module(observations))
+        feature = self.module(observations)
+        return  th.cat([self.price(self.agg(feature)), self.direction(self.agg(feature))], dim=1)
