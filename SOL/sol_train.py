@@ -105,7 +105,7 @@ def train(data, testdata, validdatae):
 
     rmse = nn.MSELoss().to(device)
     optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-5)
-
+    print(model)
     start_tim = time.time()
 
     for epoch in range(epochs):  # epochs수만큼 반복
