@@ -139,6 +139,7 @@ def train(data, testdata, validdatae):
 if __name__ == '__main__':
     data, valid = extractor.load_ml()
     test = valid[:3]
+    valid = valid[3:]
     data = DLoader(data)
     valid = DLoader(valid, data.normalizer)
     test = DLoader(test, data.normalizer)

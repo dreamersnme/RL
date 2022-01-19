@@ -12,7 +12,7 @@ TARGET ="target"
 TA ='ta'
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    thresold = 0.03
+    thresold = 0.06
 
     def __init__(self, data, normalizer = None, seq = 5, ta_seq = 5):
         self.data = data
