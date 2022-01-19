@@ -41,9 +41,9 @@ class CombinedModel(nn.Module):
         base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
         self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta),(BASE, base)]))
 
-        extractors = {OBS: SeqCNN(self.observation_space.spaces[OBS])
-            , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=16)
-            , BASE: BaseFeature(self.observation_space[BASE], out_dim=8)}
+        extractors = {OBS: SeqLstm(self.observation_space.spaces[OBS], out_dim=32)
+            , TA: SeqLstm(self.observation_space.spaces[TA], out_dim=32)
+            , BASE: BaseFeature(self.observation_space[BASE], out_dim=4)}
 
         total_concat_size = sum([module.features_dim for module in extractors.values()])
         self.extractors = nn.ModuleDict(extractors)

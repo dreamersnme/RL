@@ -12,7 +12,7 @@ TARGET ="target"
 TA ='ta'
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    def __init__(self, data, normalizer = None, seq = 20, ta_seq = 10):
+    def __init__(self, data, normalizer = None, seq = 3, ta_seq = 2):
         self.data = data
         self.day_cnt = len(data)
         self.target = [d.price.reshape(-1,1) for d in data]
