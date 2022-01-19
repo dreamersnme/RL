@@ -12,11 +12,14 @@ TARGET ="target"
 TA ='ta'
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    thresold = 0.06
+    thresold = 0.03
 
     def __init__(self, data, normalizer = None, seq = 5, ta_seq = 5):
         self.data = data
         self.day_cnt = len(data)
+        self.neg_direct = 0
+        self.pos_direct = 0
+
         self.target2 = [self.direction(d.price) for d in data]
         self.target = [d.price.reshape(-1,1) for d in data]
         self.seq = seq
@@ -35,10 +38,13 @@ class DLoader(Dataset):
         price
         surge = []
         for p in price:
-            if p <= -self.thresold: index = -1
-            elif p>=self.thresold: index = 1
+
+
+            if p <= -self.thresold: index = -1; self.pos_direct += 1
+            elif p>=self.thresold: index = 1; self.neg_direct +=1
             else: index = 0
             surge.append([index])
+
         return np.array(surge)
 
     def _get_normalizer(self):
@@ -47,17 +53,14 @@ class DLoader(Dataset):
         baseN = RunningMeanStd(shape=(self.base_len,))
         targetN = RunningMeanStd(shape=(1,))
 
-        self.neg_direct = 0
-        self.pos_direct = 0
+
         for idx in range(self.__len__()):
             obs, ta, base, target,direct = self.__getitem(idx)
             obsN.update(obs)
             taN.update(ta)
             baseN.update(base)
             targetN.update(target)
-            if direct >0: self.pos_direct +=1
-            elif direct <0: self.neg_direct +=1
-            else:pass
+
 
         return {OBS: obsN, TA:taN, BASE:baseN, TARGET:targetN}
 

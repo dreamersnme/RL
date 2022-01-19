@@ -32,19 +32,6 @@ def obs_as_tensor(
     else:
         raise Exception(f"Unrecognized type of observation {type(obs)}")
 
-# def val(model, dataset):
-#     model.eval()
-#     test_loader = DataLoader(dataset, batch_size=128)
-#     with th.no_grad():
-#         sum = 0
-#         for data, target in test_loader:
-#             data = obs_as_tensor(data, device)
-#             pred = model(data).cpu().numpy()
-#             target = target.numpy()
-#             abs = dataset.abs_diff(pred, target)
-#             sum +=np.sum(abs)
-#         print('Eval diff  = {:>.4}'.format(sum/dataset.__len__()))
-#     model.train()
 
 
 def unit(arr, thre = 0.001):
@@ -61,17 +48,15 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
     same_direct =  p_d - p_p
     same_direct = np.where(same_direct != 0)[0].shape[0]
 
-    pre_d = unit(pre_d, 0.5)
+    pre_d = unit(pre_d, 0.1)
     tri = np.abs(pre_d)
     cnt = tri.sum()
 
     diff=0
     correct =0
     if cnt > 0:
-        # tru_direct = tru_direct[:,0].numpy()
-        cor_direct = np.where(unit(pre_p,0.03) == pre_d, 1, 0)
-
-        correct = np.sum(cor_direct * tri)
+        cor_direct = np.where(p_p == pre_d, 1, 0)
+        correct = np.sum(cor_direct *tri )
         diff = (pre_p - denormali(target)[:,0]) * tri
         diff = np.sum(np.abs(diff))
     return diff, cnt, correct, same_direct
