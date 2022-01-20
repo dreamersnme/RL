@@ -1,3 +1,4 @@
+import random
 import time
 from typing import Dict, Union
 
@@ -92,8 +93,8 @@ def trade(pred, target, denormali):
         diff = np.sum(np.abs(diff))
 
         test = np.where(tri ==1)
-        idx = np.random(test[0].shape[0])
-        print("---")
+        idx = random.choice(test[0])
+        print("---", idx)
         print(np.round(true[idx], 3))
         print(np.round(pre_p[idx], 3))
         print(np.round(pre_d[idx], 3))
@@ -118,7 +119,7 @@ def valall(model, dataset):
 
 def val(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=2000)
+    test_loader = DataLoader(dataset, batch_size=000)
     with th.no_grad():
         sum = 0
         pre_cnt = 0
