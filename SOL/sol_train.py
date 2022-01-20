@@ -40,37 +40,48 @@ def unit(arr, thre = 0.001):
     return plus + minus
 
 def trigger(pre_d, pre_p):
-    direct = unit(pre_d, 0.33)
-    price_direct = unit(pre_p, 0.02)
-    return ((direct + price_direct)/2).astype(int)
+
+    direct = unit(pre_d, 0.5)
+    price = unit(pre_p, 0.02)
+    all_sum = np.concatenate((price, direct), axis=1)
+    all_sum = np.sum(all_sum, axis=-1)
+    tri = np.abs(all_sum)
+    tri = np.where(tri >=3, 1,0)
+    return tri
 
 
-def trade(pre_p, pre_d, target, denormali, tru_direct):
-    pre_d = pre_d[:, 0]
-    pre_p = denormali(pre_p)[:, 0]
-    p_d = unit(pre_d)
-    p_p = unit(pre_p)
-    same_direct =  p_d - p_p
-    same_direct = np.where(same_direct != 0)[0].shape[0]
+def consense(pre_d, pre_p):
+    direct = unit(pre_d, 0.5)
+    price = unit(pre_p, 0.001)
+    all_sum = np.concatenate((price, direct), axis=1)
+    all_sum = np.sum(all_sum, axis=-1)
+    tri = np.abs(all_sum)
+    tri = np.where(tri >=3, 1,0)
+    return np.sum(tri)
 
-    pre_d = trigger(pre_d, pre_p)
-    tri = np.abs(pre_d)
+
+
+def trade(pred, target, denormali):
+    pre_p, pre_d = pred[:,:3], pred[:,3:]
+    pre_p = denormali(pre_p)
+    tri = trigger(pre_d, pre_p)
+    pred_quality = consense(pre_d, pre_p)
     cnt = tri.sum()
-
     diff=0
     correct =0
     if cnt > 0:
         tru = denormali(target)[:, 0]
-        cor_direct = np.where(unit(tru, 0.005) == pre_d, 1, 0)
+        predict = pre_p[:,0]
+        cor_direct = np.where(unit(tru, 0.005) == unit(predict, 0.005), 1, 0)
         correct = np.sum(cor_direct *tri)
 
-        diff = (pre_p - tru) * tri
+        diff = (predict - tru) * tri
         diff = np.sum(np.abs(diff))
-    return diff, cnt, correct, same_direct
+    return diff, cnt, correct, pred_quality
 
 def valall(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=128)
+    test_loader = DataLoader(dataset, batch_size=1000)
     with th.no_grad():
         sum = 0
 
@@ -93,10 +104,9 @@ def val(model, dataset):
         same_direct = 0
 
         for data, target, direct in test_loader:
-            # data = obs_as_tensor(data, device)
+
             pred = model(data).cpu().numpy()
-            pre_p, pre_d = pred[:,0:1], pred[:,1:2]
-            diff, cnt, correct, pre_same = trade(pre_p, pre_d, target.cpu().numpy(), dataset.denorm_target, direct)
+            diff, cnt, correct, pre_same = trade(pred, target.cpu().numpy(), dataset.denorm_target)
             sum += diff
             pre_cnt +=cnt
             cor_d_cnt += correct
@@ -110,12 +120,15 @@ def val(model, dataset):
 
 
 
-eval_interval = 5
+eval_interval = 1
 def train(data, testdata, validdatae):
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
     model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)
     model.train()
-
+    # for param in model.module.parameters():
+    #     param.requires_grad = False
+    #
+    #
 
     rmse = nn.MSELoss().to(device)
     optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-5)
