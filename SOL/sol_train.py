@@ -143,6 +143,7 @@ def train(data, testdata, validdatae):
             print("==== VALID (overlap, all) ===")
             val(model, testdata)
             val(model, validdatae)
+            valall(model, testdata)
             valall(model, validdatae)
             start_tim = now
 
