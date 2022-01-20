@@ -66,12 +66,11 @@ class OutterModel(nn.Module):
         self.agg = nn.Sequential(
             nn.Linear(dim1, dim2),
             nn.BatchNorm1d(dim2),
-            nn.Mish(),
-            nn.Dropout (0.2),
+            nn.Mish()
         )
-        self.price = nn.Linear (dim2, 1)
+        self.price = nn.Linear (dim2, 3)
         self.direction =  nn.Sequential(
-            nn.Linear(dim2, 1),
+            nn.Linear(dim2, 2),
             nn.Tanh())
 
     def forward(self, observations: TensorDict) -> th.Tensor:
