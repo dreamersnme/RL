@@ -15,9 +15,9 @@ DIRECT = "direct"
 DEVICE ="cuda"
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    thresold = 0.06
+    thresold = 0.1
 
-    def __init__(self, data, normalizer = None, seq = 15, ta_seq = 10):
+    def __init__(self, data, normalizer = None, seq = 40, ta_seq = 20):
         self.data = data
         self.day_cnt = len(data)
         self.neg_direct = 0

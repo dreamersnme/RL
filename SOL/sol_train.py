@@ -16,22 +16,22 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.005
-batch_size = 128
+learning_rate = 0.001
+batch_size = 64
 num_classes = 10
 epochs = 20000
 
 
-def obs_as_tensor(
-    obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
-) -> Union[th.Tensor, TensorDict]:
-    if isinstance(obs, th.Tensor):
-        return obs.to(device)
-    elif isinstance(obs, dict):
-        return {key: _obs.to(device) for (key, _obs) in obs.items()}
-    else:
-        raise Exception(f"Unrecognized type of observation {type(obs)}")
-
+# def obs_as_tensor(
+#     obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
+# ) -> Union[th.Tensor, TensorDict]:
+#     if isinstance(obs, th.Tensor):
+#         return obs.to(device)
+#     elif isinstance(obs, dict):
+#         return {key: _obs.to(device) for (key, _obs) in obs.items()}
+#     else:
+#         raise Exception(f"Unrecognized type of observation {type(obs)}")
+#
 
 
 def unit(arr, thre = 0.001):
@@ -68,6 +68,20 @@ def trade(pre_p, pre_d, target, denormali, tru_direct):
         diff = np.sum(np.abs(diff))
     return diff, cnt, correct, same_direct
 
+def valall(model, dataset):
+    model.eval()
+    test_loader = DataLoader(dataset, batch_size=128)
+    with th.no_grad():
+        sum = 0
+
+        for data, target, _ in test_loader:
+            pred = model(data)[:,0:1].cpu().numpy()
+            target = target.cpu().numpy()
+            abs = dataset.abs_diff(pred, target)
+            sum +=np.sum(abs)
+        print('ALL Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
+    model.train()
+
 
 def val(model, dataset):
     model.eval()
@@ -79,7 +93,7 @@ def val(model, dataset):
         same_direct = 0
 
         for data, target, direct in test_loader:
-            data = obs_as_tensor(data, device)
+            # data = obs_as_tensor(data, device)
             pred = model(data).cpu().numpy()
             pre_p, pre_d = pred[:,0:1], pred[:,1:2]
             diff, cnt, correct, pre_same = trade(pre_p, pre_d, target.cpu().numpy(), dataset.denorm_target, direct)
@@ -111,9 +125,9 @@ def train(data, testdata, validdatae):
     for epoch in range(epochs):  # epochs수만큼 반복
         avg_loss = 0
         for data, target, direction in train_loader:
-            data = obs_as_tensor(data, device)
-            target = obs_as_tensor(target, device)
-            direction = obs_as_tensor (direction, device)
+            # data = obs_as_tensor(data, device)
+            # target = obs_as_tensor(target, device)
+            # direction = obs_as_tensor (direction, device)
             target = th.cat([target, direction], dim=1)
             optimizer.zero_grad()
             hypothesis = model(data)
@@ -129,6 +143,7 @@ def train(data, testdata, validdatae):
             print("==== VALID (overlap, all) ===")
             val(model, testdata)
             val(model, validdatae)
+            valall(model, validdatae)
             start_tim = now
 
 
