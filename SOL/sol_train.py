@@ -57,12 +57,13 @@ def trigger(pre_d, pre_p, target):
 
 
 def consense(pre_d, pre_p):
-    direct = unit(pre_d, 0.5)
-    price = unit(pre_p, 0.001)
-    all_sum = np.concatenate((price, direct), axis=1)
+    direct = unit(pre_d, 0.1) #upper
+    anti = unit(pre_d, 0.05) #lower
+    price = unit(pre_p, 0.003)
+    all_sum = np.concatenate((price, direct, anti ), axis=1)
     all_sum = np.sum(all_sum, axis=-1)
     tri = np.abs(all_sum)
-    tri = np.where(tri >=3, 1,0)
+    tri = np.where(tri >=4, 1,0)
     return np.sum(tri)
 
 
@@ -119,7 +120,7 @@ def valall(model, dataset):
 
 def val(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=000)
+    test_loader = DataLoader(dataset, batch_size=2000)
     with th.no_grad():
         sum = 0
         pre_cnt = 0
