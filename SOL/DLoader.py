@@ -9,7 +9,7 @@ from SOL import extractor
 from stable_baselines3.common import utils
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
-TARGET ="target"
+PRICE = "price"
 TA ='ta'
 DIRECT = "direct"
 DEVICE ="cuda"
@@ -23,8 +23,8 @@ class DLoader(Dataset):
         self.neg_direct = 0
         self.pos_direct = 0
 
-        self.target2 = [self.direction(d.price) for d in data]
-        self.target = [d.price.reshape(-1,1) for d in data]
+        self.direction = [self.cal_direction(d.price) for d in data]
+        self.price = [ self.cal_price(d.price)for d in data]
         self.seq = seq
         self.ta_seq = ta_seq
         self.feature_len = self.data[0].data.shape[1]
@@ -36,30 +36,36 @@ class DLoader(Dataset):
         if normalizer is None: self.normalizer = self._get_normalizer()
         self.up_gpu()
 
+    def cal_price(self, price):
+        self.price_len = 3
+        plus = np.array([p if p>0 else 0 for p in price])
+        miunus = np.array([ p if p < 0 else 0 for p in price])
+        prices =  np.stack((price, plus, miunus ), axis=1)
 
-    def direction(self, price):
-        price
+        return prices
+
+    def cal_direction(self, price):
         surge = []
         for p in price:
-            if p <= -self.thresold: index = -1; self.pos_direct += 1
-            elif p>=self.thresold: index = 1; self.neg_direct +=1
-            else: index = 0
-            surge.append([index])
+            if p>=self.thresold: index = [1,0]; self.neg_direct +=1
+            elif p <= -self.thresold: index = [0, -1]; self.pos_direct += 1
+            else: index = [0,0]
+            surge.append(index)
         return np.array(surge)
 
     def _get_normalizer(self):
         obsN = RunningMeanStd(shape=(self.feature_len,))
         taN = RunningMeanStd(shape=(self.ta_len,))
         baseN = RunningMeanStd(shape=(self.base_len,))
-        targetN = RunningMeanStd(shape=(1,))
+        priceN = RunningMeanStd(shape=(self.price_len,))
         for day_no in range(self.day_cnt):
             day = self.data[day_no]
             obsN.update(day.data)
             taN.update(day.ta)
             baseN.update(day.base)
-            targetN.update(self.target[day_no])
+            priceN.update(self.price[day_no])
 
-        return {OBS: obsN, TA:taN, BASE:baseN, TARGET:targetN}
+        return {OBS: obsN, TA:taN, BASE:baseN, PRICE:priceN}
 
     def up_gpu(self):
         days =dict()
@@ -68,10 +74,10 @@ class DLoader(Dataset):
             obs = utils.obs_as_tensor(self.normalize(OBS, day.data), DEVICE)
             ta = utils.obs_as_tensor(self.normalize(TA, day.ta), DEVICE)
             base = utils.obs_as_tensor(self.normalize(BASE, day.base), DEVICE)
-            price = utils.obs_as_tensor(self.normalize(TARGET, self.target[day_no]), DEVICE)
-            direct = utils.obs_as_tensor(self.target2[day_no], DEVICE)
+            price = utils.obs_as_tensor(self.normalize(PRICE, self.price[day_no]), DEVICE)
+            direct = utils.obs_as_tensor(self.direction[day_no], DEVICE)
             day_data ={
-                OBS:obs, TA:ta, BASE:base, TARGET:price, DIRECT:direct}
+                OBS:obs, TA:ta, BASE:base, PRICE:price, DIRECT:direct}
             days[day_no]=day_data
         self.data = days
 
@@ -91,23 +97,23 @@ class DLoader(Dataset):
         return ((obs - obs_rms.mean) / np.sqrt(obs_rms.var + self.epsilon)).astype(np.float32)
 
     def denorm_target(self, target):
-        obs_rms = self.normalizer[TARGET]
+        obs_rms = self.normalizer[PRICE]
         return (target * np.sqrt (obs_rms.var + self.epsilon)) + obs_rms.mean
 
 
     def abs_diff(self, pred, true):
         return np.abs(self.denorm_target(pred)- self.denorm_target(true))
 
-    def __getitem(self, idx):
-        if idx >= self.daily_idx[-1]: raise IndexError(idx)
-
-        day_no, idx = self.day_search(idx)
-        day = self.data[day_no]
-        s_idx = idx
-        e_idx = idx+self.seq-1
-        obs = day.data[s_idx: e_idx+1]
-        ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
-        return obs, ta, day.base, self.target[day_no][e_idx], self.target2[day_no][e_idx]
+    # def __getitem(self, idx):
+    #     if idx >= self.daily_idx[-1]: raise IndexError(idx)
+    #
+    #     day_no, idx = self.day_search(idx)
+    #     day = self.data[day_no]
+    #     s_idx = idx
+    #     e_idx = idx+self.seq-1
+    #     obs = day.data[s_idx: e_idx+1]
+    #     ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
+    #     return obs, ta, day.base, self.direction[day_no][e_idx], self.price[day_no][e_idx]
 
     def __getitem__(self, idx):
         if idx >= self.daily_idx[-1]: raise IndexError(idx)
@@ -117,15 +123,9 @@ class DLoader(Dataset):
         e_idx = idx+self.seq-1
         obs = day[OBS][s_idx: e_idx+1]
         ta = day[TA][e_idx -self.ta_seq +1 :e_idx+1]
-        return ({OBS:obs, TA:ta, BASE:day[BASE]}, day[TARGET][e_idx], day[DIRECT][e_idx])
+        return ({OBS:obs, TA:ta, BASE:day[BASE]}, day[PRICE][e_idx], day[DIRECT][e_idx])
 
     #
-    # def __getitem__(self, idx):
-    #     obs, ta, base, target, target2 = self.__getitem(idx)
-    #     return ({OBS:self.normalize(OBS,obs)
-    #                 ,TA:self.normalize(TA, ta)
-    #                 ,BASE:self.normalize(BASE,base)}
-    #             , self.normalize(TARGET,target), target2)
 
     def __len__(self):
         return self.daily_idx[-1]
