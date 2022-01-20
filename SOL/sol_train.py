@@ -41,18 +41,15 @@ def unit(arr, thre = 0.001):
 
 def trigger(pre_d, pre_p, target):
 
-    print("---")
-    print(np.round(target[100], 3))
-    print(np.round(pre_p[100], 3))
-    print(np.round(pre_d[100], 3))
+    # print("---")
+    # print(np.round(target[100], 3))
+    # print(np.round(pre_p[100], 3))
+    # print(np.round(pre_d[100], 3))
     direct = unit(pre_d, 0.5) #upper
     anti = unit(pre_d, 0.05) #lower
     price = unit(pre_p, 0.02)
     all_sum = np.concatenate((price, direct, anti ), axis=1)
-    print(all_sum[100])
     all_sum = np.sum(all_sum, axis=-1)
-    print(all_sum[100])
-
     tri = np.abs(all_sum)
     tri = np.where(tri >=4, 1,0)
     return tri
@@ -80,20 +77,28 @@ def trade(pred, target, denormali):
     pre_p = denormali(pre_p)
     pre_p, pre_d = trim_p(pre_p, pre_d)
 
-    tru = denormali(target)
-    tri = trigger(pre_d, pre_p, tru)
+    true = denormali(target)
+    tri = trigger(pre_d, pre_p, true)
     pred_quality = consense(pre_d, pre_p)
     cnt = tri.sum()
     diff=0
     correct =0
     if cnt > 0:
-        tru = tru[:, 0]
+        tru = true[:, 0]
         predict = pre_p[:,0]
         cor_direct = np.where(unit(tru, 0.005) == unit(predict, 0.005), 1, 0)
         correct = np.sum(cor_direct *tri)
-
         diff = (predict - tru) * tri
         diff = np.sum(np.abs(diff))
+
+        test = np.where(tri ==1)
+        idx = np.random(test[0].shape[0])
+        print("---")
+        print(np.round(true[idx], 3))
+        print(np.round(pre_p[idx], 3))
+        print(np.round(pre_d[idx], 3))
+
+
     return diff, cnt, correct, pred_quality
 
 def valall(model, dataset):
