@@ -42,14 +42,9 @@ def unit(arr, thre = 0.001):
 
 def trigger(pre_d, pre_p, target):
 
-    # print("---")
-    # print(np.round(target[100], 3))
-    # print(np.round(pre_p[100], 3))
-    # print(np.round(pre_d[100], 3))
     direct = unit(pre_d, 0.5) #upper
-    anti = unit(pre_d, 0.05) #lower
     price = unit(pre_p, 0.02)
-    all_sum = np.concatenate((price, direct, anti ), axis=1)
+    all_sum = np.concatenate((price, direct), axis=1)
     all_sum = np.sum(all_sum, axis=-1)
     tri = np.abs(all_sum)
     tri = np.where(tri >=4, 1,0)
@@ -58,26 +53,16 @@ def trigger(pre_d, pre_p, target):
 
 def consense(pre_d, pre_p):
     direct = unit(pre_d, 0.1) #upper
-    anti = unit(pre_d, 0.05) #lower
     price = unit(pre_p, 0.003)
-    all_sum = np.concatenate((price, direct, anti ), axis=1)
-    all_sum = np.sum(all_sum, axis=-1)
-    tri = np.abs(all_sum)
-    tri = np.where(tri >=4, 1,0)
-    return np.sum(tri)
+
+    return np.count_nonzero(direct-price)
 
 
-def trim_p(price, direct):
-    price = np.minimum(price, np.array([10, 10, 0]))
-    price = np.maximum(price, np.array([-10, 0, -10]))
-    direct = np.minimum(direct, np.array([10, 0]))
-    direct = np.maximum(direct, np.array([0, -10]))
-    return price, direct
+
 
 def trade(pred, target, denormali):
-    pre_p, pre_d = pred[:,:3], pred[:,3:]
+    pre_p, pre_d = pred[:,:2], pred[:,2:]
     pre_p = denormali(pre_p)
-    pre_p, pre_d = trim_p(pre_p, pre_d)
 
     true = denormali(target)
     tri = trigger(pre_d, pre_p, true)
@@ -108,12 +93,12 @@ def valall(model, dataset):
     test_loader = DataLoader(dataset, batch_size=1000)
     with th.no_grad():
         sum = 0
-
         for data, target, _ in test_loader:
-            pred = model(data)[:,0:1].cpu().numpy()
-            target = target.cpu().numpy()
-            abs = dataset.abs_diff(pred, target)
-            sum +=np.sum(abs)
+            pred = model(data)[:,:2].cpu().numpy()
+            pred = dataset.denorm_target(pred)
+            true = dataset.denorm_target(target.cpu().numpy())
+            diff = np.sum(np.abs(pred-true))
+            sum +=np.sum(diff)
         print('ALL Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
     model.train()
 

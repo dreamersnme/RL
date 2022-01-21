@@ -69,7 +69,7 @@ class OutterModel(nn.Module):
             nn.Mish(),
             nn.Dropout(0.2)
         )
-        self.price = nn.Linear (dim2, 3)
+        self.price = nn.Linear (dim2, 2)
         self.direction =  nn.Sequential(
             nn.Linear(dim2, 2),
             nn.Tanh())

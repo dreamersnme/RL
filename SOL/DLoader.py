@@ -22,9 +22,9 @@ class DLoader(Dataset):
         self.day_cnt = len(data)
         self.neg_direct = 0
         self.pos_direct = 0
-
         self.direction = [self.cal_direction(d.price) for d in data]
-        self.price = [ self.cal_price(d.price)for d in data]
+        self.price = [self.cal_price(d.price)for d in data]
+        self.price_len = self.price[0].shape[1]
         self.seq = seq
         self.ta_seq = ta_seq
         self.feature_len = self.data[0].data.shape[1]
@@ -37,21 +37,25 @@ class DLoader(Dataset):
         self.up_gpu()
 
     def cal_price(self, price):
-        self.price_len = 3
-        plus = np.array([p if p>0 else 0 for p in price])
-        miunus = np.array([ p if p < 0 else 0 for p in price])
-        prices =  np.stack((price, plus, miunus ), axis=1)
-
-        return prices
+        return price
+        #
+        # plus = np.array([p if p>0 else 0 for p in price])
+        # miunus = np.array([ p if p < 0 else 0 for p in price])
+        # prices =  np.stack((price, plus, miunus ), axis=1)
+        # return prices
 
     def cal_direction(self, price):
-        surge = []
-        for p in price:
-            if p>=self.thresold: index = [1,0]; self.neg_direct +=1
-            elif p <= -self.thresold: index = [0, -1]; self.pos_direct += 1
-            else: index = [0,0]
-            surge.append(index)
-        return np.array(surge)
+        plus = np.where(price>=self.thresold, 1, 0)
+        mius = np.where(price<=self.thresold, -1, 0)
+        return plus + mius
+
+        # surge = []
+        # for p in price:
+        #     if p>=self.thresold: index = [1,0]; self.neg_direct +=1
+        #     elif p <= -self.thresold: index = [0, -1]; self.pos_direct += 1
+        #     else: index = [0,0]
+        #     surge.append(index)
+        # return np.array(surge)
 
     def _get_normalizer(self):
         obsN = RunningMeanStd(shape=(self.feature_len,))
