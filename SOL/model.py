@@ -69,9 +69,9 @@ class OutterModel(nn.Module):
             nn.Mish(),
             nn.Dropout(0.2)
         )
-        self.price = nn.Linear (dim2, 2)
+        self.price = nn.Linear (dim2, 5)
         self.direction =  nn.Sequential(
-            nn.Linear(dim2, 2),
+            nn.Linear(dim2, 5),
             nn.Tanh())
 
     def forward(self, observations: TensorDict) -> th.Tensor:
