@@ -18,10 +18,10 @@ if device == 'cuda':
 
 
 learning_rate = 0.001
-batch_size = 64
+batch_size = 128
 num_classes = 10
-epochs = 20000
-
+epochs = 2000
+eval_interval = 10
 
 # def obs_as_tensor(
 #     obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
@@ -133,7 +133,7 @@ def val(model, dataset):
 
 
 
-eval_interval = 1
+
 def train(data, testdata, validdatae):
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
     model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)

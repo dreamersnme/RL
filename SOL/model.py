@@ -22,9 +22,9 @@ class RMSELoss(nn.Module):
 class ObsNN(nn.Module):
     def __init__(self, space):
         super(ObsNN,self).__init__()
-        outdim = 16
+        outdim = 32
         # self.parallels = [SeqLstm(space, out_dim=outdim), SeqCRNN(space, out_dim=outdim), SeqCNN(space, out_dim=outdim)]
-        self.parallels = [SeqCNN(space, out_dim=outdim)]
+        self.parallels = [SeqCRNN(space, out_dim=outdim)]
         self.parallels = nn.ModuleList(self.parallels)
         self.features_dim = outdim * len(self.parallels)
 

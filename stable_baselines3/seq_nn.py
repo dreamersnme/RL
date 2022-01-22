@@ -56,7 +56,7 @@ class SeqFeature(BaseFeaturesExtractor):
 
 class CNN(nn.Module):
 
-    def __init__(self, observation_space: gym.spaces.Box, channels=[5,2], span=3):
+    def __init__(self, observation_space: gym.spaces.Box, channels=[5,10], span=4):
         super (CNN, self).__init__ ()
         seq_len = observation_space.shape[0]
         seq_width = observation_space.shape[1]
@@ -65,7 +65,8 @@ class CNN(nn.Module):
         layer_cnt = len(channels)
         out_seq_len = (seq_len - layer_cnt*span*2 + layer_cnt*2)
         assert out_seq_len > 1
-        self.feature_dim = out_seq_len * seq_width * channels[-1]
+        self.feature_concat_dim = seq_width * channels[-1]
+        self.feature_dim = out_seq_len * self.feature_concat_dim
         self.input = nn.Unflatten(-2, (1, seq_len))
         cnns = []
         in_dim = 1
@@ -92,7 +93,7 @@ class SeqCNN (BaseFeaturesExtractor):
         super (SeqCNN, self).__init__ (observation_space, features_dim=out_dim)
         self.cnn = CNN(observation_space)
         self.flatten = nn.Sequential (
-            nn.Flatten (), nn.Linear (self.cnn.feature_dim, out_dim), nn.Mish ())
+            nn.Flatten (start_dim=1), nn.Linear (self.cnn.feature_dim, out_dim), nn.Mish ())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         ss = self.cnn(observations)
@@ -117,12 +118,18 @@ class SeqCRNN (BaseFeaturesExtractor):
         super (SeqCRNN, self).__init__ (observation_space, features_dim=out_dim)
         self.cnn = CNN(observation_space)
         self.rnn = nn.Sequential (
-            nn.Flatten (end_dim=-2),
-            SeqLstm(observation_space, out_dim)
+            nn.Flatten (start_dim=-2),
+            LstmLast(seq_width=self.cnn.feature_concat_dim, hidden=out_dim),
+            nn.Mish(),
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.rnn(self.cnn(observations))
+        cc = self.cnn(observations)
+        cc = th.transpose(cc, dim0=-3, dim1=-2)
+        return self.rnn(cc)
+
+
+        # return self.rnn(self.cnn(observations))
 
 
 
