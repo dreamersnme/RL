@@ -23,14 +23,14 @@ class ObsNN(nn.Module):
     def __init__(self, space):
         super(ObsNN,self).__init__()
         outdim = 16
-
-        self.features_dim = outdim *3
-        self.lstm = SeqLstm(space, out_dim=outdim)
-        self.crnn = SeqCRNN(space, out_dim=outdim)
-        self.cnn = SeqCNN(space, out_dim=outdim)
+        # self.parallels = [SeqLstm(space, out_dim=outdim), SeqCRNN(space, out_dim=outdim), SeqCNN(space, out_dim=outdim)]
+        self.parallels = [SeqCNN(space, out_dim=outdim)]
+        self.parallels = nn.ModuleList(self.parallels)
+        self.features_dim = outdim * len(self.parallels)
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return th.cat([self.lstm(observations),self.cnn(observations), self.crnn(observations)], dim=1)
+        parallels = [P(observations) for P in self.parallels]
+        return th.cat(parallels, dim=1)
 
 
 class CombinedModel(nn.Module):

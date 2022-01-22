@@ -63,12 +63,13 @@ class CNN(nn.Module):
 
         span = min (seq_len, span)
         layer_cnt = len(channels)
-        out_seq_len = (seq_len - layer_cnt*span + layer_cnt)
+        out_seq_len = (seq_len - layer_cnt*span*2 + layer_cnt*2)
         assert out_seq_len > 1
-        self.out_size = out_seq_len * seq_width * channels[-1]
+        self.feature_dim = out_seq_len * seq_width * channels[-1]
         self.input = nn.Unflatten(-2, (1, seq_len))
         cnns = []
         in_dim = 1
+
         for ch in channels:
             cnns.extend(self.cnn_module(in_dim, ch, span))
             in_dim = ch
@@ -76,8 +77,9 @@ class CNN(nn.Module):
 
     def cnn_module(self, inch, outch, span):
         return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
-            , nn.BatchNorm2d(outch)
             , nn.Mish()
+            , nn.MaxPool2d(kernel_size=(span, 1), stride=1)
+            , nn.BatchNorm2d(outch)
             , nn.Dropout(0.2)]
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
@@ -90,10 +92,11 @@ class SeqCNN (BaseFeaturesExtractor):
         super (SeqCNN, self).__init__ (observation_space, features_dim=out_dim)
         self.cnn = CNN(observation_space)
         self.flatten = nn.Sequential (
-            nn.Flatten (), nn.Linear (self.cnn.out_size, out_dim), nn.Mish ())
+            nn.Flatten (), nn.Linear (self.cnn.feature_dim, out_dim), nn.Mish ())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.flatten(self.cnn(observations))
+        ss = self.cnn(observations)
+        return self.flatten(ss)
 
 
 
