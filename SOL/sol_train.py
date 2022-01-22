@@ -84,10 +84,10 @@ def trade(pred, target, denormali):
 
         test = np.where(tri ==1)
         idx = random.choice(test[0])
-        print("---", idx)
-        print(np.round(true[idx], 3))
-        print(np.round(pre_p[idx], 3))
-        print(np.round(pre_d[idx], 3))
+        # print("---", idx)
+        # print(np.round(true[idx], 3))
+        # print(np.round(pre_p[idx], 3))
+        # print(np.round(pre_d[idx], 3))
 
 
     return diff, cnt, correct, pred_quality
@@ -134,17 +134,38 @@ def val(model, dataset):
 
 
 
+class CECK():
+    best_loss = 1000
+    file_name = 'best-model.pt'
+    def save_best(self, model, loss):
+        loss = loss.cpu().detach().numpy()
+        if loss <= self.best_loss:
+            th.save(model.state_dict(), self.file_name)
+            print("SAVED: ", loss)
+            self.best_loss = loss
+
+    def load(self, model):
+        try:
+            model.load_state_dict(th.load(self.file_name))
+            # print(model.state_dict())
+        except:
+            pass
+
+
 def train(data, testdata, validdatae):
+    ckp = CECK()
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
     model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)
+    ckp.load(model)
+
     model.train()
     # for param in model.module.parameters():
     #     param.requires_grad = False
     #
     #
-
     rmse = nn.MSELoss().to(device)
     optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-5)
+
 
     start_tim = time.time()
 
@@ -161,6 +182,8 @@ def train(data, testdata, validdatae):
             loss.backward()
             optimizer.step()
             avg_loss += loss / len(train_loader)  # loss 값을 변수에 누적하고 train_loader의 개수로 나눔 = 평균
+
+        ckp.save_best(model, avg_loss)
 
         if (epoch +1)%eval_interval ==0:
             now = time.time()
