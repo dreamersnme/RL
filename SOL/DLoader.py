@@ -15,7 +15,7 @@ DIRECT = "direct"
 DEVICE ="cuda"
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    thresold = 0.1
+    thresold = 0.08
 
     def __init__(self, data, normalizer = None, seq = 40, ta_seq = 20):
         self.data = data
@@ -23,7 +23,7 @@ class DLoader(Dataset):
         self.neg_direct = 0
         self.pos_direct = 0
         self.direction = [self.cal_direction(d.price) for d in data]
-        self.price = [self.cal_price(d.price)for d in data]
+        self.price = [d.price for d in data]
         self.price_len = self.price[0].shape[1]
         self.seq = seq
         self.ta_seq = ta_seq
