@@ -44,24 +44,28 @@ def trigger(pre_d, pre_p, target):
 
     direct = unit(pre_d, 0.5) #upper
     price = unit(pre_p, 0.02)
+
     all_sum = np.concatenate((price, direct), axis=1)
     all_sum = np.sum(all_sum, axis=-1)
     tri = np.abs(all_sum)
-    tri = np.where(tri >=4, 1,0)
+    tri = np.where(tri >=10, 1,0)
     return tri
 
 
 def consense(pre_d, pre_p):
-    direct = unit(pre_d, 0.1) #upper
-    price = unit(pre_p, 0.003)
+    direct = unit(pre_d, 0.02) #upper
+    price = unit(pre_p, 0.01)
 
-    return np.count_nonzero(direct-price)
-
+    all_sum = np.concatenate((price, direct), axis=1)
+    all_sum = np.sum(all_sum, axis=-1)
+    tri = np.abs(all_sum)
+    tri = np.where(tri >=10, 1,0)
+    return np.sum(tri)
 
 
 
 def trade(pred, target, denormali):
-    pre_p, pre_d = pred[:,:2], pred[:,2:]
+    pre_p, pre_d = pred[:,:5], pred[:,5:]
     pre_p = denormali(pre_p)
 
     true = denormali(target)
@@ -94,10 +98,10 @@ def valall(model, dataset):
     with th.no_grad():
         sum = 0
         for data, target, _ in test_loader:
-            pred = model(data)[:,:2].cpu().numpy()
+            pred = model(data)[:,:5].cpu().numpy()
             pred = dataset.denorm_target(pred)
             true = dataset.denorm_target(target.cpu().numpy())
-            diff = np.sum(np.abs(pred-true))
+            diff = np.sum(np.abs(pred[:,0]-true[:,0]))
             sum +=np.sum(diff)
         print('ALL Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
     model.train()
@@ -172,7 +176,6 @@ def train(data, testdata, validdatae):
 
     # test
      # evaluate mode로 전환 dropout 이나 batch_normalization 해제
-
 
 
 if __name__ == '__main__':
