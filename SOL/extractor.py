@@ -88,8 +88,11 @@ def get_base():
     df_o['price'] = df_o['open'] + (df_o['close'] -df_o['open'])*0.2
     df_o['transaction'] = (df_o['price'].shift(-1)).fillna(0)
     del df_o['price']
-    df_o['return5'] = (df_o['transaction'].shift(-5) -df_o['transaction']).fillna(0)
-    df_o['return1'] = (df_o['transaction'].shift(-1) - df_o['transaction']).fillna(0)
+    df_o['re1'] = (df_o['transaction'].shift (-1) - df_o['transaction']).fillna (0)
+    df_o['re2'] = (df_o['transaction'].shift (-2) - df_o['transaction']).fillna (0)
+    df_o['re3'] = (df_o['transaction'].shift (-3) - df_o['transaction']).fillna (0)
+    df_o['re4'] = (df_o['transaction'].shift (-4) - df_o['transaction']).fillna (0)
+    df_o['re5'] = (df_o['transaction'].shift(-5) -df_o['transaction']).fillna(0)
 
     df = df_o[ (df_o.h >=tm[0]-1) & (df_o.h <=tm[1]+1)]
     base = get_dt_base(df_o)
@@ -203,8 +206,8 @@ def _load(target, trim ):
     return all_days, feature_size, base_size
 
 def load_ml():
-    all_days, feature_size, base_size = _load(['return1', 'return5']
-                 , ['st_dt','return1','transaction', 'return5','m_diff' ])
+    all_days, feature_size, base_size = _load(['re1', 're2', 're3', 're4', 're5']
+                 , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
     TRAIN, _, TEST = split(all_days)
     return TRAIN, TEST
 
