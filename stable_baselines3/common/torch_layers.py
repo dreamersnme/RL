@@ -2,6 +2,7 @@ from itertools import zip_longest
 from typing import Dict, List, Tuple, Type, Union
 
 from CONFIG import *
+
 from stable_baselines3.common.preprocessing import get_flattened_obs_dim, is_image_space
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.common.utils import get_device
@@ -210,27 +211,24 @@ class FlattenExtractor(BaseFeaturesExtractor):
         return self.flatten(observations)
 
 
-
+from SOL.model import ObsNN, TaNN
 
 class CombinedExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Dict, cnn_output_dim: int = 128):
-        # TODO we do not know features-dim here before going over all the items, so put something there. This is dirty!
-        super(CombinedExtractor, self).__init__(observation_space, features_dim=1)
+    def __init__(self, observation_space: gym.spaces.Dict):
+        super (CombinedExtractor, self).__init__ (observation_space, features_dim=1)
+        extractors = {OBS: ObsNN (observation_space.spaces[OBS])
+            , TA: TaNN (observation_space.spaces[TA])
+            , BASE: BaseFeature (observation_space[BASE], out_dim=4)}
 
-        extractors = {OBS: SeqFeature(observation_space.spaces[OBS])
-            , STAT: FlattenExtractor(observation_space.spaces[STAT])
-            , BASE: BaseFeature(observation_space.spaces[BASE])}
-
-        total_concat_size = sum([module.features_dim for module in extractors.values()])
-        self.extractors = nn.ModuleDict(extractors)
+        total_concat_size = sum ([module.features_dim for module in extractors.values ()])
+        self.extractors = nn.ModuleDict (extractors)
         self._features_dim = total_concat_size
 
     def forward(self, observations: TensorDict) -> th.Tensor:
         encoded_tensor_list = []
-        for key, extractor in self.extractors.items():
-            encoded_tensor_list.append(extractor(observations[key]))
-        return th.cat(encoded_tensor_list, dim=1)
-
+        for key, extractor in self.extractors.items ():
+            encoded_tensor_list.append (extractor (observations[key]))
+        return th.cat (encoded_tensor_list, dim=1)
 
 def get_actor_critic_arch(net_arch: Union[List[int], Dict[str, List[int]]]) -> Tuple[List[int], List[int]]:
     """
