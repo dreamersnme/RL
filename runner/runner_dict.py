@@ -6,27 +6,31 @@ from torch.utils.tensorboard import SummaryWriter
 
 from SOL import extractor
 from runner.callbacks import LearnEndCallback
-from sim.env_dy.day_evn import Days
+from sim.env_dy.norm_env import NormedDays
+
 from stable_baselines3.common.noise import NormalActionNoise
 
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 import numpy as np
 
+ENV = NormedDays
+DATA, _ = extractor.load_gpu(labeld=False)
+# DATA = extractor.load_ml()
 
-ENV = Days
+TRAIN = DATA[-8:-3]
+TEST = DATA[-5:]
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 4
-    unit_episode = extractor.TRAIN_DAYS
+    BOOST_SEARCH = 1
+    unit_episode = len(TRAIN)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.7
     seq = 5
-    def __init__(self, MODEL, arc=[128, 64], nproc=1, retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, arc=[128, 64], retrain=False, batch_size=128, seed=None):
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
-        self.test_env =  ENV(title=self.name, test=True, verbose=True, plot_dir="./sFig/{}".format(self.name))
+        self.test_env =  ENV(data=TEST, title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
         self.env = self.make_env()
         self.writer = self.tensorboard("./summary_all/{}/".format(self.name))
         self.save = f"ckpt_{self.name}"
@@ -34,7 +38,7 @@ class IterRun:
         self.arch = arc
         self.iter = 1
         self.time_recoder = TimeRecode(self.writer)
-        self.nproc =nproc
+
         self.batch_size = batch_size
         if retrain:
             pass
@@ -42,13 +46,12 @@ class IterRun:
         else : self.set_same()
 
     def make_env(self):
-        env = DummyVecEnv([lambda: ENV(verbose=False)])
-        return VecNormalize(env, norm_obs_keys=["obs", "stat"])
+        env = ENV(data=TRAIN, verbose=False)
+        return env
 
     def init_env(self):
         self.test_env.reset_env()
-        enves = self.env.venv.envs
-        for ee in enves: ee.reset_env()
+        self.env.reset_env()
 
     def set_same(self):
         model = self.unit_model()
@@ -69,7 +72,7 @@ class IterRun:
     def init_boost(self, MIN_TRADE, min_reward=-1000):
         print("-----  BOOST UP", self.name)
 
-        test_env = ENV(verbose=False, test=True)
+        test_env = ENV(data=TEST, verbose=False)
         minimum = -1e8
         suit_model = None
 
@@ -183,7 +186,6 @@ class IterRun:
         done = False
         rewards = []
         while not done:
-            obs = self.env.normalize_obs(obs)
             action, _states = model.predict(obs)
             obs, reward, done, info = env.cont_step(action)
             rewards.append(reward)
