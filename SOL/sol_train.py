@@ -202,10 +202,12 @@ def train(data, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    data, valid = extractor.load_ml()
-    test = valid[:3]
-    valid = valid[3:]
-    data = DLoader(data)
-    valid = DLoader(valid, data.normalizer)
-    test = DLoader(test, data.normalizer)
+    DATA, norm = extractor.load_gpu()
+
+    data = DATA[:-5]
+    test = DATA[-8:-5]
+    valid = DATA[-5:]
+    data = DLoader(data, norm)
+    valid = DLoader(valid, norm)
+    test = DLoader(test, norm)
     train(data,test, valid )
