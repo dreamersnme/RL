@@ -30,7 +30,6 @@ from stable_baselines3.common.utils import (
     update_learning_rate,
 )
 from stable_baselines3.common.vec_env import (
-    DummyVecEnv,
     VecEnv,
     VecNormalize,
     VecTransposeImage,
@@ -159,12 +158,10 @@ class BaseAlgorithm(ABC):
                 if create_eval_env:
                     self.eval_env = maybe_make_env(env, self.verbose)
 
-            env = maybe_make_env(env, self.verbose)
-            env = self._wrap_env(env, self.verbose, monitor_wrapper)
-
             self.observation_space = env.observation_space
+            self.observation_data_space = env.observation_data_space
             self.action_space = env.action_space
-            self.n_envs = env.num_envs
+
             self.env = env
 
             if supported_action_spaces is not None:
@@ -184,57 +181,6 @@ class BaseAlgorithm(ABC):
 
             if self.use_sde and not isinstance(self.action_space, gym.spaces.Box):
                 raise ValueError("generalized State-Dependent Exploration (gSDE) can only be used with continuous actions.")
-
-    @staticmethod
-    def _wrap_env(env: GymEnv, verbose: int = 0, monitor_wrapper: bool = True) -> VecEnv:
-        """ "
-        Wrap environment with the appropriate wrappers if needed.
-        For instance, to have a vectorized environment
-        or to re-order the image channels.
-
-        :param env:
-        :param verbose:
-        :param monitor_wrapper: Whether to wrap the env in a ``Monitor`` when possible.
-        :return: The wrapped environment.
-        """
-        if not isinstance(env, VecEnv):
-            if not is_wrapped(env, Monitor) and monitor_wrapper:
-                if verbose >= 1:
-                    print("Wrapping the env with a `Monitor` wrapper")
-                env = Monitor(env)
-            if verbose >= 1:
-                print("Wrapping the env in a DummyVecEnv.")
-            env = DummyVecEnv([lambda: env])
-
-        # Make sure that dict-spaces are not nested (not supported)
-        check_for_nested_spaces(env.observation_space)
-
-        if isinstance(env.observation_space, gym.spaces.Dict):
-            for space in env.observation_space.spaces.values():
-                if isinstance(space, gym.spaces.Dict):
-                    raise ValueError("Nested observation spaces are not supported (Dict spaces inside Dict space).")
-
-        if not is_vecenv_wrapped(env, VecTransposeImage):
-            wrap_with_vectranspose = False
-            if isinstance(env.observation_space, gym.spaces.Dict):
-                # If even one of the keys is a image-space in need of transpose, apply transpose
-                # If the image spaces are not consistent (for instance one is channel first,
-                # the other channel last), VecTransposeImage will throw an error
-                for space in env.observation_space.spaces.values():
-                    wrap_with_vectranspose = wrap_with_vectranspose or (
-                        is_image_space(space) and not is_image_space_channels_first(space)
-                    )
-            else:
-                wrap_with_vectranspose = is_image_space(env.observation_space) and not is_image_space_channels_first(
-                    env.observation_space
-                )
-
-            if wrap_with_vectranspose:
-                if verbose >= 1:
-                    print("Wrapping the env in a VecTransposeImage.")
-                env = VecTransposeImage(env)
-
-        return env
 
     @abstractmethod
     def _setup_model(self) -> None:
@@ -428,15 +374,6 @@ class BaseAlgorithm(ABC):
         if reset_num_timesteps or self._last_obs is None:
             self._last_obs = self.env.reset()  # pytype: disable=annotation-type-mismatch
 
-            self._last_episode_starts = np.ones((self.env.num_envs,), dtype=bool)
-            # Retrieve unnormalized observation for saving into the buffer
-            if self._vec_normalize_env is not None:
-                self._last_original_obs = self._vec_normalize_env.get_original_obs()
-
-        if eval_env is not None and self.seed is not None:
-            eval_env.seed(self.seed)
-
-        eval_env = self._get_eval_env(eval_env)
 
         # Configure logger's outputs if no logger was passed
         if not self._custom_logger:
@@ -705,7 +642,7 @@ class BaseAlgorithm(ABC):
 
         if env is not None:
             # Wrap first if needed
-            env = cls._wrap_env(env, data["verbose"])
+
             # Check if given env is valid
             check_for_correct_spaces(env, data["observation_space"], data["action_space"])
             # Discard `_last_obs`, this will force the env to reset before training

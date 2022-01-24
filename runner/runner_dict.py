@@ -26,7 +26,7 @@ class IterRun:
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.7
     seq = 5
-    def __init__(self, MODEL, arc=[128, 64], retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, arc=[128, 64], retrain=False, batch_size=3, seed=None):
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
@@ -186,7 +186,7 @@ class IterRun:
         done = False
         rewards = []
         while not done:
-            action, _states = model.predict(obs)
+            action, _states = model.predict(env.get_stat_data(obs))
             obs, reward, done, info = env.cont_step(action)
             rewards.append(reward)
 

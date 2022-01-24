@@ -16,6 +16,7 @@ from SOL.extractor import as_gpu_tensor
 from SOL.normali import MeanStdNormali
 from sim.epi_plot import EpisodePlot
 import time
+import torch as th
 
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
@@ -49,12 +50,13 @@ class NormedDays(gym.Env):
         stat = spaces.Box (low=-np.inf, high=np.inf, shape=(2,))
         self.observation_data_space = spaces.Dict(OrderedDict([(STAT, stat), (OBS, obs), (TA, ta), (BASE, base)]))
 
-        obs_idx = spaces.Box(low=-np.inf, high=np.inf, shape=(2, ))
-        ta_idx = spaces.Box (low=-np.inf, high=np.inf, shape=(2, ))
-        base_idx = spaces.Box(low=-np.inf, high=np.inf, shape=(1,))
+        obs_idx = spaces.Box(low=-np.inf, high=np.inf, shape=(3, ), dtype=np.int)
+        ta_idx = spaces.Box (low=-np.inf, high=np.inf, shape=(3, ), dtype=np.int)
+        base_idx = spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.int)
         self.observation_space = spaces.Dict (OrderedDict ([(STAT, stat), (OBS, obs_idx), (TA, ta_idx), (BASE, base_idx)]))
 
         self.stat_norm = MeanStdNormali(shape=(2,))
+        self.reward_norm = MeanStdNormali(shape=(1,))
         self.reset_env()
 
 
@@ -77,18 +79,18 @@ class NormedDays(gym.Env):
         self.done = True
 
     def reset(self):
-
         if not self.done: raise Exception("Reset without reach end")
         if self.today >= self.day_count:
             self.reset_env()
 
-        TODAY = self.DATA[self.today]
-        self.OBSERV = TODAY[OBS]
-        self.TA = TODAY[TA]
-        self.PRICE = (TODAY[PRICE][:,0]/TIC)*TIC_VAL
-        self.BASE = TODAY[BASE]
+        self.TAR_DAY = self.today
 
-        self.END = self.OBSERV.shape[0] - 1 - 1# 마지막인덱스는 최후청산용,신규 obs로 못씀
+        TODAY = self.DATA[self.TAR_DAY]
+        self.PRICE = (TODAY[PRICE][:,0]/TIC)*TIC_VAL
+        self.END = TODAY[OBS].shape[0] - 1 - 1# 마지막인덱스는 최후청산용,신규 obs로 못씀
+
+
+
         self.step_no = self.obs_seq - 1 # 0부터 시작
 
         unrealized_pnl = 0.0
@@ -101,13 +103,14 @@ class NormedDays(gym.Env):
         return self.state
 
     def get_obs(self, unrealized_pnl, pos):
-        obs = [self.step_no - self.obs_seq + 1,  self.step_no + 1]
-        ta = [self.step_no - self.ta_seq + 1, self.step_no + 1]
+        obs = [self.TAR_DAY, self.step_no - self.obs_seq + 1,  self.step_no + 1]
+        ta = [self.TAR_DAY, self.step_no - self.ta_seq + 1, self.step_no + 1]
 
         self.stat_mem = [unrealized_pnl, pos]
         stat = np.array(self.stat_mem.copy())
         self.stat_norm.update(stat)
-        base = [self.today]
+        base = [self.TAR_DAY]
+
         stat_dict = OrderedDict([(STAT, stat), (OBS, obs), (TA, ta), (BASE, base)])
         return stat_dict
 
@@ -116,14 +119,37 @@ class NormedDays(gym.Env):
         TODAY = self.DATA[day_no]
         base = TODAY[BASE]
         obs = stat[OBS]
-        obs = TODAY[OBS][obs[0]:obs[1]]
+        obs = self.DATA[obs[0]][OBS][obs[1]:obs[2]]
         ta = stat[TA]
-        ta = TODAY[TA][ta[0]:ta[1]]
-
+        ta =  self.DATA[ta[0]][TA][ta[1]:ta[2]]
         stat = self.stat_norm.normalize(stat[STAT])
         stat = as_gpu_tensor(stat)
         stat_dict = OrderedDict([(STAT, stat), (OBS, obs), (TA, ta), (BASE, base)])
         return stat_dict
+
+    def get_stat_data_batch(self, stat):
+        obses = stat[OBS]
+        obses = [self.DATA[obs[0]][OBS][obs[1]:obs[2]] for obs in obses]
+        stat[OBS] = th.stack(obses, dim=0)
+
+        obses = stat[TA]
+        obses = [self.DATA[obs[0]][TA][obs[1]:obs[2]] for obs in obses]
+        stat[TA] = th.stack(obses, dim=0)
+
+        obses = stat[STAT]
+        obses = [as_gpu_tensor(self.stat_norm.normalize(obs)) for obs in obses]
+        stat[STAT] = th.stack(obses, dim=0)
+
+        obses = stat[BASE]
+        obses = [self.DATA[obs[0]][BASE] for obs in obses]
+        stat[BASE] = th.stack(obses, dim=0)
+
+        return stat
+
+
+    def normalize_reward(self, reword):
+        return self.reward_norm.normalize(reword)
+
 
 
     def getprice(self, step=None):
@@ -165,6 +191,7 @@ class NormedDays(gym.Env):
             print(self.title, "EPI TIME:", self.duration)
             self.render()
 
+        self.reward_norm.update(np.array([b]))
         return a, b, c, d
 
     def finish_all(self):

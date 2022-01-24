@@ -40,7 +40,6 @@ class BaseBuffer(ABC):
         observation_space: spaces.Space,
         action_space: spaces.Space,
         device: Union[th.device, str] = "cpu",
-        n_envs: int = 1,
     ):
         super(BaseBuffer, self).__init__()
         self.buffer_size = buffer_size
@@ -52,7 +51,6 @@ class BaseBuffer(ABC):
         self.pos = 0
         self.full = False
         self.device = device
-        self.n_envs = n_envs
 
     @staticmethod
     def swap_and_flatten(arr: np.ndarray) -> np.ndarray:
@@ -177,7 +175,7 @@ class ReplayBuffer(BaseBuffer):
         device: Union[th.device, str] = "cpu",
         n_envs: int = 1,
         optimize_memory_usage: bool = False,
-        handle_timeout_termination: bool = True,
+
     ):
         super(ReplayBuffer, self).__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
 
@@ -204,8 +202,8 @@ class ReplayBuffer(BaseBuffer):
         self.dones = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         # Handle timeouts termination properly if needed
         # see https://github.com/DLR-RM/stable-baselines3/issues/284
-        self.handle_timeout_termination = handle_timeout_termination
-        self.timeouts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+
+
 
         if psutil is not None:
             total_memory_usage = self.observations.nbytes + self.actions.nbytes + self.rewards.nbytes + self.dones.nbytes
@@ -254,8 +252,7 @@ class ReplayBuffer(BaseBuffer):
         self.rewards[self.pos] = np.array(reward).copy()
         self.dones[self.pos] = np.array(done).copy()
 
-        if self.handle_timeout_termination:
-            self.timeouts[self.pos] = np.array([info.get("TimeLimit.truncated", False) for info in infos])
+
 
         self.pos += 1
         if self.pos == self.buffer_size:
@@ -502,14 +499,13 @@ class DictReplayBuffer(ReplayBuffer):
         observation_space: spaces.Space,
         action_space: spaces.Space,
         device: Union[th.device, str] = "cpu",
-        n_envs: int = 1,
         optimize_memory_usage: bool = False,
         handle_timeout_termination: bool = True,
     ):
-        super(ReplayBuffer, self).__init__(buffer_size, observation_space, action_space, device, n_envs=n_envs)
+        super(ReplayBuffer, self).__init__(buffer_size, observation_space, action_space, device)
 
         assert isinstance(self.obs_shape, dict), "DictReplayBuffer must be used with Dict obs space only"
-        self.buffer_size = max(buffer_size // n_envs, 1)
+        self.buffer_size = max(buffer_size, 1)
 
         # Check that the replay buffer can fit into the memory
         if psutil is not None:
@@ -520,24 +516,25 @@ class DictReplayBuffer(ReplayBuffer):
         # https://github.com/DLR-RM/stable-baselines3/pull/243#discussion_r531535702
         self.optimize_memory_usage = optimize_memory_usage
 
+
         self.observations = {
-            key: np.zeros((self.buffer_size, self.n_envs) + _obs_shape, dtype=observation_space[key].dtype)
+            key: np.zeros((self.buffer_size, ) + _obs_shape, dtype=observation_space[key].dtype)
             for key, _obs_shape in self.obs_shape.items()
         }
 
         self.next_observations = {
-            key: np.zeros((self.buffer_size, self.n_envs) + _obs_shape, dtype=observation_space[key].dtype)
+            key: np.zeros((self.buffer_size,) + _obs_shape, dtype=observation_space[key].dtype)
             for key, _obs_shape in self.obs_shape.items()
         }
 
-        self.actions = np.zeros((self.buffer_size, self.n_envs, self.action_dim), dtype=action_space.dtype)
-        self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
-        self.dones = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.actions = np.zeros((self.buffer_size, self.action_dim), dtype=action_space.dtype)
+        self.rewards = np.zeros((self.buffer_size, ), dtype=np.float32)
+        self.dones = np.zeros((self.buffer_size, ), dtype=np.float32)
 
         # Handle timeouts termination properly if needed
         # see https://github.com/DLR-RM/stable-baselines3/issues/284
         self.handle_timeout_termination = handle_timeout_termination
-        self.timeouts = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
+        self.timeouts = np.zeros((self.buffer_size,), dtype=np.float32)
 
         if psutil is not None:
             obs_nbytes = 0
@@ -590,9 +587,6 @@ class DictReplayBuffer(ReplayBuffer):
         self.rewards[self.pos] = np.array(reward).copy()
         self.dones[self.pos] = np.array(done).copy()
 
-        if self.handle_timeout_termination:
-            self.timeouts[self.pos] = np.array([info.get("TimeLimit.truncated", False) for info in infos])
-
         self.pos += 1
         if self.pos == self.buffer_size:
             self.full = True
@@ -612,29 +606,31 @@ class DictReplayBuffer(ReplayBuffer):
     def _get_samples(self, batch_inds: np.ndarray, env: Optional[VecNormalize] = None) -> DictReplayBufferSamples:
 
         # Sample randomly the env idx
-        env_indices = np.random.randint(0, high=self.n_envs, size=(len(batch_inds),))
+
 
         # Normalize if needed and remove extra dimension (we are using only one env for now)
 
 
 
-        obs_ = self._normalize_obs({key: obs[batch_inds, env_indices, :] for key, obs in self.observations.items()}, env)
-        next_obs_ = self._normalize_obs({key: obs[batch_inds, env_indices, :] for key, obs in self.next_observations.items()}, env)
+        obs_ = {key: obs[batch_inds, :] for key, obs in self.observations.items()}
+        next_obs_ = {key: obs[batch_inds, :] for key, obs in self.next_observations.items()}
+
 
         # Convert to torch tensor
-        observations = {key: self.to_torch(obs) for key, obs in obs_.items()}
-        next_observations = {key: self.to_torch(obs) for key, obs in next_obs_.items()}
+        observations = env.get_stat_data_batch(obs_)
+        next_observations = env.get_stat_data_batch(next_obs_)
+
 
         return DictReplayBufferSamples(
             observations=observations,
-            actions=self.to_torch(self.actions[batch_inds, env_indices]),
+            actions=self.to_torch(self.actions[batch_inds]),
             next_observations=next_observations,
             # Only use dones that are not due to timeouts
             # deactivated by default (timeouts is initialized as an array of False)
-            dones=self.to_torch(self.dones[batch_inds, env_indices] * (1 - self.timeouts[batch_inds, env_indices])).reshape(
+            dones=self.to_torch(self.dones[batch_inds] * (1 - self.timeouts[batch_inds])).reshape(
                 -1, 1
             ),
-            rewards=self.to_torch(self._normalize_reward(self.rewards[batch_inds, env_indices].reshape(-1, 1), env)),
+            rewards=self.to_torch(self._normalize_reward(self.rewards[batch_inds].reshape(-1, 1), env)),
         )
 
 

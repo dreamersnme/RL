@@ -229,29 +229,15 @@ class BaseModel(nn.Module, ABC):
             observation = copy.deepcopy(observation)
             for key, obs in observation.items():
                 obs_space = self.observation_space.spaces[key]
-                if is_image_space(obs_space):
-                    obs_ = maybe_transpose(obs, obs_space)
-                else:
-                    obs_ = np.array(obs)
+
+                obs_ = obs
                 vectorized_env = vectorized_env or is_vectorized_observation(obs_, obs_space)
                 # Add batch dimension if needed
                 observation[key] = obs_.reshape((-1,) + self.observation_space[key].shape)
 
-        elif is_image_space(self.observation_space):
-            # Handle the different cases for images
-            # as PyTorch use channel first format
-            observation = maybe_transpose(observation, self.observation_space)
 
-        else:
-            observation = np.array(observation)
 
-        if not isinstance(observation, dict):
-            # Dict obs need to be handled separately
-            vectorized_env = is_vectorized_observation(observation, self.observation_space)
-            # Add batch dimension if needed
-            observation = observation.reshape((-1,) + self.observation_space.shape)
 
-        observation = obs_as_tensor(observation, self.device)
         return observation, vectorized_env
 
 

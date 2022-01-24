@@ -144,7 +144,7 @@ class TD3(OffPolicyAlgorithm):
 
             self._n_updates += 1
             # Sample replay buffer
-            replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+            replay_data = self.replay_buffer.sample(batch_size, env=self.env)
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise

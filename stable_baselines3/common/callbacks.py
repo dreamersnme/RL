@@ -8,7 +8,7 @@ import numpy as np
 
 from stable_baselines3.common import base_class  # pytype: disable=pyi-error
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
+from stable_baselines3.common.vec_env import VecEnv, sync_envs_normalization
 
 
 class BaseCallback(ABC):
@@ -315,8 +315,7 @@ class EvalCallback(EventCallback):
         self.warn = warn
 
         # Convert to VecEnv for consistency
-        if not isinstance(eval_env, VecEnv):
-            eval_env = DummyVecEnv([lambda: eval_env])
+
 
         self.eval_env = eval_env
         self.best_model_save_path = best_model_save_path
