@@ -7,7 +7,6 @@ from gym import spaces
 
 from CONFIG import *
 from SOL.DLoader import TA
-from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN, SeqCNN
 
@@ -33,24 +32,9 @@ class ObsNN(nn.Module):
         parallels = [P(observations) for P in self.parallels]
         return th.cat(parallels, dim=1)
 
+class TaNN(ObsNN):
+    pass
 
-class SeqFeatureExtractor(BaseFeaturesExtractor):
-    def __init__(self, observation_space: spaces.Dict):
-        super(SeqFeatureExtractor, self).__init__(observation_space, features_dim=1)
-
-        extractors = {OBS: ObsNN(observation_space.spaces[OBS])
-            , TA: ObsNN(observation_space.spaces[TA])
-            , BASE: BaseFeature(observation_space[BASE], out_dim=4)}
-
-        total_concat_size = sum([module.features_dim for module in extractors.values()])
-        self.extractors = nn.ModuleDict(extractors)
-        self._features_dim = total_concat_size
-
-    def forward(self, observations: TensorDict) -> th.Tensor:
-        encoded_tensor_list = []
-        for key, extractor in self.extractors.items():
-            encoded_tensor_list.append(extractor(observations[key]))
-        return th.cat(encoded_tensor_list, dim=1)
 
 class OutterModel(nn.Module):
 
@@ -60,9 +44,9 @@ class OutterModel(nn.Module):
         base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
         observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta), (BASE, base)]))
 
-
         super(OutterModel, self).__init__()
-        self.module = SeqFeatureExtractor(observation_space)
+        from stable_baselines3.common.torch_layers import CombinedExtractor
+        self.module = CombinedExtractor(observation_space)
         dim1 = self.module.features_dim
         dim2= int(dim1/2)
 
