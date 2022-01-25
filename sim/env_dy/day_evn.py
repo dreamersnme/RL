@@ -24,14 +24,14 @@ MAX_TRADE = 2
 class Days(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, title="MAIN", test=False, verbose=False, plot_dir=None, seq=5):
+    def __init__(self, data, title="MAIN", verbose=False, plot_dir=None, seq=5):
         self.plot_fig = None if not plot_dir else EpisodePlot(title, plot_dir)
         self.title = title
         self.iteration = 0
         self.verbose = verbose
         self.seq = seq
-        self.DATA = extractor.TEST if test else extractor.TRAIN
-        feature_length = extractor.feature_size
+        self.DATA = data
+        feature_length = data.
         base_feature_len = extractor.base_size
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float16)
         obs = spaces.Box(low=-np.inf, high=np.inf, shape=(self.seq, feature_length))
