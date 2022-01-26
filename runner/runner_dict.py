@@ -4,6 +4,7 @@ import time
 
 from torch.utils.tensorboard import SummaryWriter
 
+from CONFIG import DataSpec
 from SOL import extractor
 from runner.callbacks import LearnEndCallback
 from sim.env_dy.day_evn import Days
@@ -13,20 +14,25 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
+data = extractor.load_ml()
+valid = data[-8:]
+data = data[-10:-5]
+
 ENV = Days
+SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 4
-    unit_episode = extractor.TRAIN_DAYS
+    unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.7
-    seq = 5
+
     def __init__(self, MODEL, arc=[128, 64], nproc=1, retrain=False, batch_size=128, seed=None):
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
-        self.test_env =  ENV(title=self.name, test=True, verbose=True, plot_dir="./sFig/{}".format(self.name))
+        self.test_env =  ENV(valid, SPEC, title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
         self.env = self.make_env()
         self.writer = self.tensorboard("./summary_all/{}/".format(self.name))
         self.save = f"ckpt_{self.name}"
@@ -42,7 +48,7 @@ class IterRun:
         else : self.set_same()
 
     def make_env(self):
-        env = DummyVecEnv([lambda: ENV(verbose=False)])
+        env = DummyVecEnv([lambda: ENV(data, SPEC, verbose=False)])
         return VecNormalize(env, norm_obs_keys=["obs", "stat"])
 
     def init_env(self):
@@ -69,7 +75,7 @@ class IterRun:
     def init_boost(self, MIN_TRADE, min_reward=-1000):
         print("-----  BOOST UP", self.name)
 
-        test_env = ENV(verbose=False, test=True)
+        test_env = ENV(valid, SPEC, verbose=False)
         minimum = -1e8
         suit_model = None
 
