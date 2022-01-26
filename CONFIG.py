@@ -21,8 +21,8 @@ DEVICE ="cuda"
 INPUT_SET =[STAT, BASE, OBS]
 
 ROOT  = os.path.dirname(os.path.abspath(__file__)+"/../")
-
-
+MODEL_DIR = os.path.join(ROOT, "MODELS")
+PRETRAINED = os.path.join(MODEL_DIR, "best_model.pt")
 
 class DataSpec:
     obs_seq = 20

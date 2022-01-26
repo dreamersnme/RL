@@ -21,7 +21,7 @@ learning_rate = 0.001
 batch_size = 128
 num_classes = 10
 epochs = 2000
-eval_interval = 3
+eval_interval = 10
 
 # def obs_as_tensor(
 #     obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
@@ -85,10 +85,10 @@ def trade(pred,price_len, target, denormali):
 
         test = np.where(tri ==1)
         idx = random.choice(test[0])
-        print("---", idx)
-        print(np.round(true[idx], 3))
-        print(np.round(pre_p[idx], 3))
-        print(np.round(pre_d[idx], 3))
+        # print("---", idx)
+        # print(np.round(true[idx], 3))
+        # print(np.round(pre_p[idx], 3))
+        # print(np.round(pre_d[idx], 3))
 
 
     return diff, cnt, correct, pred_quality
@@ -137,7 +137,7 @@ def val(model, dataset):
 
 class CECK():
     best_loss = 1000
-    file_name = 'best-model.pt'
+    file_name = PRETRAINED
     def save_best(self, model, loss):
         loss = loss.cpu().detach().numpy()
         if loss <= self.best_loss:
@@ -206,8 +206,8 @@ def train(data, testdata, validdatae):
 
 if __name__ == '__main__':
     data = extractor.load_ml()
-    valid = data[-8:]
-    data = data[:-5]
+    valid = data[-6:]
+    data = data[-10:-3]
 
     test = valid[:3]
     valid = valid[3:]

@@ -4,6 +4,7 @@ import sys
 import gym
 from gym import register
 
+from CONFIG import PRETRAINED
 from runner.runner_dict import IterRun
 from stable_baselines3 import DDPG, SAC,TD3
 import numpy as np
@@ -16,7 +17,7 @@ def compair_run(iter, model=None):
     noise_set = np.linspace(0.05, 0.6,5)
     nis_start = 5
 
-    if model not in names:targets =[IterRun(TD3)]#, IterRun(DDPG), IterRun(SAC)]
+    if model not in names:targets =[IterRun(TD3, PRETRAINED)]#, IterRun(DDPG), IterRun(SAC)]
     else: targets = [IterRun(names[model])]
 
 

@@ -152,6 +152,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             self.policy_kwargs["use_sde"] = self.use_sde
         # For gSDE only
         self.use_sde_at_warmup = use_sde_at_warmup
+        self.actors =[]
 
     def _convert_train_freq(self) -> None:
         """

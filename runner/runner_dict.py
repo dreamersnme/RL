@@ -3,9 +3,10 @@ import shutil
 import time
 
 from torch.utils.tensorboard import SummaryWriter
-
+import torch as th
 from CONFIG import DataSpec
 from SOL import extractor
+
 from runner.callbacks import LearnEndCallback
 from sim.env_dy.day_evn import Days
 from stable_baselines3.common.noise import NormalActionNoise
@@ -15,20 +16,23 @@ import numpy as np
 
 
 data = extractor.load_ml()
-valid = data[-8:]
-data = data[-10:-5]
+valid = data[-6:]
+data = data[-10:-3]
 
 ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 4
+    BOOST_SEARCH = 1
     unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.7
+    adapt_delay = 4
 
-    def __init__(self, MODEL, arc=[128, 64], nproc=1, retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, TRANSFER = None, arc=[128, 64], retrain=False, batch_size=128, seed=None):
+        self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
+
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
@@ -40,12 +44,17 @@ class IterRun:
         self.arch = arc
         self.iter = 1
         self.time_recoder = TimeRecode(self.writer)
-        self.nproc =nproc
         self.batch_size = batch_size
-        if retrain:
-            pass
+        if retrain: pass
         elif self.seed is None: self.init_boost (self.MIN_TRADE)
-        else : self.set_same()
+        else :self.set_same()
+
+    def transfer(self, trained_file):
+        from SOL.model import OutterModel
+        pre_trained = OutterModel(SPEC)
+        print(trained_file)
+        pre_trained.load_state_dict(th.load(trained_file))
+        return pre_trained.module
 
     def make_env(self):
         env = DummyVecEnv([lambda: ENV(data, SPEC, verbose=False)])
@@ -126,11 +135,21 @@ class IterRun:
                                gradient_steps= 1, gamma=1.0,
                                batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=1000_000,
                                learning_starts=learning_starts)
+
+
+        if self.TRANSFER:
+            print("TRANSFER LEARNING")
+            extractors = self.extractors(model)
+            for ex in extractors:
+                ex.load_state_dict(self.TRANSFER.state_dict())
+                ex.train(False)
+
         return model
 
-    def load_model(self, noise):
+    def extractors(self, model): return [aa.features_extractor.combined for aa in model.actors]
 
-        model = self.model_cls.load (self.save, env=self.env)
+    def load_model(self, noise):
+        model = self.model_cls.load(self.save, env=self.env)
         if self.buffer: model.replay_buffer = self.buffer
         model.set_random_seed (self.seed)
         for grad_on_epi in self.grad_steps:
@@ -145,6 +164,10 @@ class IterRun:
             model.action_noise.sigma=noise * np.ones(1)
             print(self.name,"Noise Reset:", noise)
 
+        if self.TRANSFER and self.iter < self.adapt_delay:
+            print (" FIX EXTRACTOR :", self.adapt_delay, self.iter)
+            for ex in self.extractors(model): ex.train(False)
+
         return model
 
     def train_eval(self, traing_epi = None, noise=None):
@@ -153,7 +176,7 @@ class IterRun:
         self.seed = np.random.randint (1e8)
         traing_epi = traing_epi or self.train_epi
         model = self.load_model(noise)
-
+        print([ee.training for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
         model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)

@@ -9,8 +9,7 @@ from gym import spaces
 from talib import abstract
 
 from CONFIG import *
-from SOL.DLoader import TA
-from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
+
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN, SeqCNN
 
@@ -41,11 +40,11 @@ class TaNN(ObsNN):
 
 class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
-        super (CombinedModel, self).__init__ (observation_space, features_dim=1)
+        super (CombinedModel, self).__init__ ()
         extractors = self.get_dict(observation_space)
         total_concat_size = sum ([module.features_dim for module in extractors.values()])
         self.extractors = nn.ModuleDict (extractors)
-        self._features_dim = total_concat_size
+        self.features_dim = total_concat_size
 
     def get_dict(self, observation_space):
         return {OBS: ObsNN (observation_space.spaces[OBS])
