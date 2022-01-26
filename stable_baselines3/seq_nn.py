@@ -12,7 +12,7 @@ class BaseFeature(BaseFeaturesExtractor):
         in_dim = gym.spaces.utils.flatdim(observation_space)
         self.dense = nn.Sequential(
             nn.Linear(in_dim, out_dim),
-            nn.ReLU()
+            nn.Mish()
         )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
