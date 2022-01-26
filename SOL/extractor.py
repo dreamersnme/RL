@@ -4,7 +4,7 @@ import pandas as pd
 import sqlite3
 import numpy as np
 
-from CONFIG import ROOT
+from CONFIG import *
 
 pd.set_option('display.max_columns', None)
 import talib as tb
@@ -144,7 +144,7 @@ def save():
     print("-------------ADJ---------------")
     print(adj_df.head(3))
 
-Day = namedtuple('day', ['dt', 'data', 'ta', 'price', 'base'])
+Day = namedtuple('day', ['dt', OBS, TA, BASE, PRICE])
 def load_ori():
     ql = "select * from data_19_28"
     df = pd.read_sql_query (ql, conn)
@@ -188,8 +188,8 @@ def _load(target, trim ):
 
         all_days.append(Day(st_dt, obs.to_numpy().astype(np.float32)
                             , ta.to_numpy().astype(np.float32)
-                            , price.to_numpy().astype(np.float32)
-                            , base.to_numpy().astype(np.float32)[0]))
+                            , base.to_numpy().astype(np.float32)[0]
+                            , price.to_numpy().astype(np.float32)))
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
     feature_size = len(df.columns)
     base_size = len(base.columns)
@@ -208,8 +208,7 @@ def _load(target, trim ):
 def load_ml():
     all_days, feature_size, base_size = _load(['re1', 're2', 're3', 're4', 're5']
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
-    TRAIN, _, TEST = split(all_days)
-    return TRAIN, TEST
+    return all_days
 
 def load():
     all_days, feature_size,  all_days, feature_size, base_size = _load('transaction'
