@@ -5,39 +5,26 @@ import numpy as np
 
 from gym.utils import seeding
 import gym
-from gym import spaces
 import math
 
-# ------------------------- GLOBAL PARAMETERS -------------------------
-# Start and end period of historical data in question
-from SOL import extractor
 from CONFIG import *
 from sim.epi_plot import EpisodePlot
 import time
 
 
-
-STARTING_ACC_BALANCE = 0
-MAX_TRADE = 2
-
-
 class Days(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, data, title="MAIN", verbose=False, plot_dir=None, seq=5):
+    def __init__(self, data, spec, title="MAIN", verbose=False, plot_dir=None, seq=5):
         self.plot_fig = None if not plot_dir else EpisodePlot(title, plot_dir)
         self.title = title
         self.iteration = 0
         self.verbose = verbose
-        self.seq = seq
+        self.obs_seq = spec.obs_seq
+        self.ta_seq = spec.ta_seq
         self.DATA = data
-        feature_length = data.
-        base_feature_len = extractor.base_size
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float16)
-        obs = spaces.Box(low=-np.inf, high=np.inf, shape=(self.seq, feature_length))
-        stat = spaces.Box(low=-np.inf, high=np.inf, shape=(2,))
-        base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_feature_len,))
-        self.observation_space = spaces.Dict(OrderedDict([(OBS, obs), (STAT, stat), (BASE, base)]))
+        self.observation_space = spec.observation_space
         self.reset_env()
 
 
@@ -66,14 +53,14 @@ class Days(gym.Env):
             self.reset_env()
 
         TODAY = self.DATA[self.today]
-        self.OBSERV = TODAY.data
-        self.PRICE = (TODAY.price/TIC)*TIC_VAL
+        self.PRICE = (TODAY.price[:,0] / TIC) * TIC_VAL
+        self.OBSERV = TODAY.obs
+        self.TA = TODAY.ta
         self.BASE = TODAY.base
 
 
         self.END = self.OBSERV.shape[0] - 1 - 1# 마지막인덱스는 최후청산용,신규 obs로 못씀
-
-        self.step_no = self.seq - 1 # 0부터 시작
+        self.step_no = self.obs_seq - 1 # 0부터 시작
 
         unrealized_pnl = 0.0
         self.state = self.get_obs(unrealized_pnl, 0)
@@ -86,17 +73,17 @@ class Days(gym.Env):
         return self.state
 
     def get_obs(self, unrealized_pnl, pos):
-        obs = self.OBSERV[self.step_no - self.seq + 1: self.step_no + 1]
+        obs = self.OBSERV[self.step_no - self.obs_seq + 1: self.step_no + 1]
+        ta = self.TA[self.step_no - self.ta_seq + 1: self.step_no + 1]
         stat = [unrealized_pnl, pos]
         base = self.BASE
-        stat_dict = OrderedDict([(OBS, obs), (STAT, stat),(BASE, base)])
+        stat_dict = OrderedDict ([(OBS, obs), (TA, ta), (BASE, base), (STAT, stat)])
         return stat_dict
 
 
     def getprice(self, step=None):
         if step is None: step = self.step_no
         return self.PRICE[step]
-
 
     def step_done(self, actions):
 
