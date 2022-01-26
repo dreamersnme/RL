@@ -17,20 +17,24 @@ class DLoader(Dataset):
     epsilon: float = 1e-8
     thresold = 0.08
 
-    def __init__(self, data, normalizer = None, seq = 40, ta_seq = 30):
+    def __init__(self, data, spec, normalizer = None):
         self.data = data
+        self.spec = spec
         self.day_cnt = len(data)
         self.neg_direct = 0
         self.pos_direct = 0
         self.direction = [self.cal_direction(d.price) for d in data]
         self.price = [d.price for d in data]
-        self.price_len = self.price[0].shape[1]
-        self.seq = seq
-        self.ta_seq = ta_seq
-        self.feature_len = self.data[0].data.shape[1]
-        self.ta_len = self.data[0].ta.shape[1]
-        self.base_len = self.data[0].base.shape[0]
-        self.daily_size = [day.data.shape[0] - seq+1 for day in self.data]
+
+        self.seq = spec.obs_seq
+        self.ta_seq = spec.ta_seq
+
+        self.feature_len = spec.obs_len
+        self.ta_len = spec.ta_len
+        self.base_len = spec.base_len
+        self.price_len = spec.price_len
+
+        self.daily_size = [day.obs.shape[0] - self.seq+1 for day in self.data]
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
         self.normalizer = normalizer
         if normalizer is None: self.normalizer = self._get_normalizer()
@@ -45,8 +49,9 @@ class DLoader(Dataset):
         # return prices
 
     def cal_direction(self, price):
+
         plus = np.where(price>=self.thresold, 1, 0)
-        mius = np.where(price<=self.thresold, -1, 0)
+        mius = np.where(price<=-self.thresold, -1, 0)
         return plus + mius
 
         # surge = []
@@ -64,7 +69,7 @@ class DLoader(Dataset):
         priceN = RunningMeanStd(shape=(self.price_len,))
         for day_no in range(self.day_cnt):
             day = self.data[day_no]
-            obsN.update(day.data)
+            obsN.update(day.obs)
             taN.update(day.ta)
             baseN.update(day.base)
             priceN.update(self.price[day_no])
@@ -75,7 +80,7 @@ class DLoader(Dataset):
         days =dict()
         for day_no in range(self.day_cnt):
             day = self.data[day_no]
-            obs = utils.obs_as_tensor(self.normalize(OBS, day.data), DEVICE)
+            obs = utils.obs_as_tensor(self.normalize(OBS, day.obs), DEVICE)
             ta = utils.obs_as_tensor(self.normalize(TA, day.ta), DEVICE)
             base = utils.obs_as_tensor(self.normalize(BASE, day.base), DEVICE)
             price = utils.obs_as_tensor(self.normalize(PRICE, self.price[day_no]), DEVICE)
@@ -108,16 +113,6 @@ class DLoader(Dataset):
     def abs_diff(self, pred, true):
         return np.abs(self.denorm_target(pred)- self.denorm_target(true))
 
-    # def __getitem(self, idx):
-    #     if idx >= self.daily_idx[-1]: raise IndexError(idx)
-    #
-    #     day_no, idx = self.day_search(idx)
-    #     day = self.data[day_no]
-    #     s_idx = idx
-    #     e_idx = idx+self.seq-1
-    #     obs = day.data[s_idx: e_idx+1]
-    #     ta = day.ta[e_idx -self.ta_seq +1 :e_idx+1]
-    #     return obs, ta, day.base, self.direction[day_no][e_idx], self.price[day_no][e_idx]
 
     def __getitem__(self, idx):
         if idx >= self.daily_idx[-1]: raise IndexError(idx)
