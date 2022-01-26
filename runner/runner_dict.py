@@ -4,7 +4,7 @@ import time
 
 from torch.utils.tensorboard import SummaryWriter
 import torch as th
-from CONFIG import DataSpec
+from CONFIG import DataSpec, MODEL_DIR
 from SOL import extractor
 
 from runner.callbacks import LearnEndCallback
@@ -23,12 +23,12 @@ ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 1
+    BOOST_SEARCH = 3
     unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
-    noise_std = 0.7
-    adapt_delay = 2
+    noise_std = 0.6
+    adapt_delay = 10
 
     def __init__(self, MODEL, TRANSFER = None, arc=[128, 64], retrain=False, batch_size=128, seed=None):
         self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
@@ -39,7 +39,7 @@ class IterRun:
         self.test_env =  ENV(valid, SPEC, title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
         self.env = self.make_env()
         self.writer = self.tensorboard("./summary_all/{}/".format(self.name))
-        self.save = f"ckpt_{self.name}"
+        self.save = os.path.join(MODEL_DIR, f"ckpt_{self.name}")
         self.buffer = None
         self.arch = arc
         self.iter = 1
@@ -138,7 +138,7 @@ class IterRun:
 
 
         if self.TRANSFER:
-            print("TRANSFER LEARNING")
+            print(self.name,"TRANSFER LEARNING")
             extractors = self.extractors(model)
             for ex in extractors: ex.load_state_dict(self.TRANSFER.state_dict())
             self.fix_weight(model)
@@ -164,7 +164,7 @@ class IterRun:
             print(self.name,"Noise Reset:", noise)
 
         if self.TRANSFER and self.iter <= self.adapt_delay:
-            print (" FIX EXTRACTOR :", self.iter ,"<", self.adapt_delay)
+            print(self.name," FIX EXTRACTOR :", self.iter ,"<", self.adapt_delay)
             self.fix_weight(model)
 
         return model
@@ -179,7 +179,7 @@ class IterRun:
         self.seed = np.random.randint (1e8)
         traing_epi = traing_epi or self.train_epi
         model = self.load_model(noise)
-        print([list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
+        print(self.name, [list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
         model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)

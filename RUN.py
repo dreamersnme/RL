@@ -11,23 +11,28 @@ import numpy as np
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # https://github.com/notadamking/RLTrader/issues/10
 
+class TD3X(TD3): pass
+class DDPGX(DDPG): pass
+class SACX(SAC): pass
+
 
 names = {"TD3": TD3, "DDPG":DDPG, "SAC":SAC}
+namesX = {"TD3X": TD3X, "DDPGX":DDPGX, "SACX":SACX}
 def compair_run(iter, model=None):
     noise_set = np.linspace(0.05, 0.6,5)
     nis_start = 5
 
-    if model not in names:targets =[IterRun(TD3, PRETRAINED)]#, IterRun(DDPG), IterRun(SAC)]
-    else: targets = [IterRun(names[model])]
 
+    if model in names: iter_run = IterRun(names[model])
+    elif model in namesX: iter_run = IterRun(namesX[model], PRETRAINED)
+    else : iter_run =IterRun(TD3, PRETRAINED)#, IterRun(DDPG), IterRun(SAC)]
 
     print("======================================")
     print ("======================================")
     print ("======================================")
     for i in range(1, iter):
         noise = None if i <nis_start else noise_set[(i-nis_start) % len(noise_set)]
-        for iter_run in targets:
-            iter_run.train_eval(noise=noise)
+        iter_run.train_eval(noise=noise)
 
 
 
