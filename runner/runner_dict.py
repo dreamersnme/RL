@@ -28,7 +28,7 @@ class IterRun:
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.7
-    adapt_delay = 4
+    adapt_delay = 2
 
     def __init__(self, MODEL, TRANSFER = None, arc=[128, 64], retrain=False, batch_size=128, seed=None):
         self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
@@ -140,9 +140,8 @@ class IterRun:
         if self.TRANSFER:
             print("TRANSFER LEARNING")
             extractors = self.extractors(model)
-            for ex in extractors:
-                ex.load_state_dict(self.TRANSFER.state_dict())
-                ex.train(False)
+            for ex in extractors: ex.load_state_dict(self.TRANSFER.state_dict())
+            self.fix_weight(model)
 
         return model
 
@@ -166,9 +165,13 @@ class IterRun:
 
         if self.TRANSFER and self.iter < self.adapt_delay:
             print (" FIX EXTRACTOR :", self.adapt_delay, self.iter)
-            for ex in self.extractors(model): ex.train(False)
+            self.fix_weight(model)
 
         return model
+
+    def fix_weight(self, model):
+        for ex in self.extractors(model):
+            ex.requires_grad_(False)
 
     def train_eval(self, traing_epi = None, noise=None):
         self.init_env()
@@ -176,7 +179,7 @@ class IterRun:
         self.seed = np.random.randint (1e8)
         traing_epi = traing_epi or self.train_epi
         model = self.load_model(noise)
-        print([ee.training for ee in self.extractors(model)])
+        print([list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
         model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)
