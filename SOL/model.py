@@ -1,15 +1,18 @@
+from abc import abstractmethod
 from collections import OrderedDict
 
+import gym
 import torch.nn as nn
 import torch as th
 import numpy as np
 from gym import spaces
+from talib import abstract
 
 from CONFIG import *
 from SOL.DLoader import TA
+from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
 from stable_baselines3.common.type_aliases import TensorDict
 from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN, SeqCNN
-
 
 class RMSELoss(nn.Module):
     def __init__(self):
@@ -36,17 +39,35 @@ class TaNN(ObsNN):
     pass
 
 
+class CombinedModel(BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.spaces.Dict):
+        super (CombinedModel, self).__init__ (observation_space, features_dim=1)
+        extractors = self.get_dict(observation_space)
+        total_concat_size = sum ([module.features_dim for module in extractors.values()])
+        self.extractors = nn.ModuleDict (extractors)
+        self._features_dim = total_concat_size
+
+    def get_dict(self, observation_space):
+        return {OBS: ObsNN (observation_space.spaces[OBS])
+            , TA: TaNN (observation_space.spaces[TA])
+            , BASE: BaseFeature (observation_space[BASE], out_dim=4)}
+
+    def forward(self, observations: TensorDict) -> th.Tensor:
+        encoded_tensor_list = []
+        for key, extractor in self.extractors.items ():
+            encoded_tensor_list.append (extractor (observations[key]))
+        return th.cat (encoded_tensor_list, dim=1)
+
+
+
 class OutterModel(nn.Module):
 
-    def __init__(self, feature_length, seq, ta_len, ta_seq, base_len):
-        obs = spaces.Box(low=-np.inf, high=np.inf, shape=(seq, feature_length))
-        ta = spaces.Box(low=-np.inf, high=np.inf, shape=(ta_seq, ta_len))
-        base = spaces.Box(low=-np.inf, high=np.inf, shape=(base_len,))
-        observation_space = spaces.Dict(OrderedDict([(OBS, obs), (TA, ta), (BASE, base)]))
+    def __init__(self, spec):
+        observation_space = spec.data_space
 
         super(OutterModel, self).__init__()
-        from stable_baselines3.common.torch_layers import CombinedExtractor
-        self.module = CombinedExtractor(observation_space)
+
+        self.module = CombinedModel(observation_space)
         dim1 = self.module.features_dim
         dim2= int(dim1/2)
 
@@ -56,9 +77,9 @@ class OutterModel(nn.Module):
             nn.Mish(),
             nn.Dropout(0.2)
         )
-        self.price = nn.Linear (dim2, 5)
+        self.price = nn.Linear (dim2, spec.price_len)
         self.direction =  nn.Sequential(
-            nn.Linear(dim2, 5),
+            nn.Linear(dim2, spec.price_len),
             nn.Tanh())
 
     def forward(self, observations: TensorDict) -> th.Tensor:
