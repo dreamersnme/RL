@@ -16,8 +16,8 @@ import numpy as np
 
 
 data = extractor.load_ml()
-valid = data[-8:]
-data = data[-15:-4]
+valid = data[-10:]
+data = data[-15:-5]
 
 ENV = Days
 SPEC = DataSpec (data[0])
