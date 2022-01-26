@@ -258,9 +258,15 @@ def get_actor_critic_arch(net_arch: Union[List[int], Dict[str, List[int]]]) -> T
 
 from SOL.model import CombinedModel
 
-class CombinedExtractor (CombinedModel):
-    def get_dict(self, observation_space):
-        dic = super().get_dict(observation_space)
-        dic[STAT]= FlattenExtractor(observation_space[STAT])
-        return dic
+class CombinedExtractor (BaseFeaturesExtractor):
+    def __init__(self, observation_space: gym.spaces.Box):
+        super(CombinedExtractor, self).__init__(observation_space, features_dim=1)
+        self.combined = CombinedModel(observation_space)
+        self.stat = FlattenExtractor(observation_space[STAT])
+        self._features_dim = self.combined.features_dim + self.stat.features_dim
+       
+    def forward(self, observations: TensorDict) -> th.Tensor:
+        feature = self.combined(observations)
+        stat = self.stat(observations[STAT])
+        return  th.cat([feature, stat], dim=1)
 
