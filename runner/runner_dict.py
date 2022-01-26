@@ -16,8 +16,8 @@ import numpy as np
 
 
 data = extractor.load_ml()
-valid = data[-6:]
-data = data[-10:-3]
+valid = data[-8:]
+data = data[-15:-4]
 
 ENV = Days
 SPEC = DataSpec (data[0])
@@ -163,8 +163,8 @@ class IterRun:
             model.action_noise.sigma=noise * np.ones(1)
             print(self.name,"Noise Reset:", noise)
 
-        if self.TRANSFER and self.iter < self.adapt_delay:
-            print (" FIX EXTRACTOR :", self.adapt_delay, self.iter)
+        if self.TRANSFER and self.iter <= self.adapt_delay:
+            print (" FIX EXTRACTOR :", self.iter ,"<", self.adapt_delay)
             self.fix_weight(model)
 
         return model

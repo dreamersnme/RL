@@ -206,11 +206,12 @@ def train(data, testdata, validdatae):
 
 if __name__ == '__main__':
     data = extractor.load_ml()
-    valid = data[-6:]
-    data = data[-10:-3]
+    valid = data[-8:]
+    data = data[-15:-4]
 
-    test = valid[:3]
-    valid = valid[3:]
+
+    test = valid[:4]
+    valid = valid[4:]
 
 
     REF = DataSpec (data[0])
