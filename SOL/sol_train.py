@@ -21,7 +21,7 @@ learning_rate = 0.001
 batch_size = 128
 num_classes = 10
 epochs = 2000
-eval_interval = 10
+eval_interval = 3
 
 # def obs_as_tensor(
 #     obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
@@ -41,14 +41,14 @@ def unit(arr, thre = 0.001):
     return plus + minus
 
 def trigger(pre_d, pre_p, target):
-
+    thre = pre_d.shape[1] *2
     direct = unit(pre_d, 0.5) #upper
     price = unit(pre_p, 0.02)
 
     all_sum = np.concatenate((price, direct), axis=1)
     all_sum = np.sum(all_sum, axis=-1)
     tri = np.abs(all_sum)
-    tri = np.where(tri >=10, 1,0)
+    tri = np.where(tri >=thre, 1,0)
     return tri
 
 
@@ -64,8 +64,9 @@ def consense(pre_d, pre_p):
 
 
 
-def trade(pred, target, denormali):
-    pre_p, pre_d = pred[:,:5], pred[:,5:]
+def trade(pred,price_len, target, denormali):
+
+    pre_p, pre_d = pred[:,:price_len], pred[:,price_len:]
     pre_p = denormali(pre_p)
 
     true = denormali(target)
@@ -84,10 +85,10 @@ def trade(pred, target, denormali):
 
         test = np.where(tri ==1)
         idx = random.choice(test[0])
-        # print("---", idx)
-        # print(np.round(true[idx], 3))
-        # print(np.round(pre_p[idx], 3))
-        # print(np.round(pre_d[idx], 3))
+        print("---", idx)
+        print(np.round(true[idx], 3))
+        print(np.round(pre_p[idx], 3))
+        print(np.round(pre_d[idx], 3))
 
 
     return diff, cnt, correct, pred_quality
@@ -98,7 +99,7 @@ def valall(model, dataset):
     with th.no_grad():
         sum = 0
         for data, target, _ in test_loader:
-            pred = model(data)[:,:5].cpu().numpy()
+            pred = model(data)[:,:dataset.spec.price_len].cpu().numpy()
             pred = dataset.denorm_target(pred)
             true = dataset.denorm_target(target.cpu().numpy())
             diff = np.sum(np.abs(pred[:,0]-true[:,0]))
@@ -119,7 +120,7 @@ def val(model, dataset):
         for data, target, direct in test_loader:
 
             pred = model(data).cpu().numpy()
-            diff, cnt, correct, pre_same = trade(pred, target.cpu().numpy(), dataset.denorm_target)
+            diff, cnt, correct, pre_same = trade(pred, dataset.spec.price_len, target.cpu().numpy(), dataset.denorm_target)
             sum += diff
             pre_cnt +=cnt
             cor_d_cnt += correct
@@ -149,13 +150,14 @@ class CECK():
             model.load_state_dict(th.load(self.file_name))
             # print(model.state_dict())
         except:
+            print("NEW MODEL")
             pass
 
 
 def train(data, testdata, validdatae):
     ckp = CECK()
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
-    model = OutterModel(data.feature_len, data.seq, data.ta_len, data.ta_seq, data.base_len).to(device)
+    model = OutterModel(data.spec).to(device)
     ckp.load(model)
 
     model.train()
@@ -178,6 +180,7 @@ def train(data, testdata, validdatae):
             target = th.cat([target, direction], dim=1)
             optimizer.zero_grad()
             hypothesis = model(data)
+
             loss = rmse(hypothesis, target)
             loss.backward()
             optimizer.step()
@@ -202,10 +205,18 @@ def train(data, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    data, valid = extractor.load_ml()
+    data = extractor.load_ml()
+    valid = data[-8:]
+    data = data[:-5]
+
     test = valid[:3]
     valid = valid[3:]
-    data = DLoader(data)
-    valid = DLoader(valid, data.normalizer)
-    test = DLoader(test, data.normalizer)
+
+
+    REF = DataSpec (data[0])
+
+
+    data = DLoader(data, REF)
+    valid = DLoader(valid, REF, data.normalizer)
+    test = DLoader(test, REF, data.normalizer)
     train(data,test, valid )
