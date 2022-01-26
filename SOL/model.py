@@ -39,7 +39,7 @@ class TaNN(ObsNN):
     pass
 
 
-class CombinedModel(BaseFeaturesExtractor):
+class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
         super (CombinedModel, self).__init__ (observation_space, features_dim=1)
         extractors = self.get_dict(observation_space)
