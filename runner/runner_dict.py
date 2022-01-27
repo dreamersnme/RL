@@ -16,14 +16,15 @@ import numpy as np
 
 
 data = extractor.load_ml()
-valid = data[-10:]
-data = data[-15:-5]
+data = data[-10:-3]
+valid = data[-5:]
+data = data[:-3]
 
 ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 5
+    BOOST_SEARCH = 1
     unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
