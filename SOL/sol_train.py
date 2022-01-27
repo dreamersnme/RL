@@ -17,8 +17,8 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.00005
-batch_size = 32
+learning_rate = 0.001
+batch_size = 1000
 num_classes = 10
 epochs = 2000
 eval_interval = 10
@@ -98,13 +98,18 @@ def valall(model, dataset):
     test_loader = DataLoader(dataset, batch_size=1000)
     with th.no_grad():
         sum = 0
+        multi_sum = np.zeros(dataset.spec.price_len)
         for data, target, _ in test_loader:
             pred = model(data)[:,:dataset.spec.price_len].cpu().numpy()
             pred = dataset.denorm_target(pred)
             true = dataset.denorm_target(target.cpu().numpy())
             diff = np.sum(np.abs(pred[:,0]-true[:,0]))
             sum +=np.sum(diff)
-        print('ALL Eval diff  = {:>.6}'.format(sum/dataset.__len__()))
+
+            multi_diff = np.sum(np.abs(pred-true), axis=0)
+
+            multi_sum = multi_sum+multi_diff
+        print('Eval diff: {:>.3}'.format(sum/dataset.__len__()), "  S:", np.round(multi_sum/dataset.__len__(), 3))
     model.train()
 
 
@@ -127,8 +132,8 @@ def val(model, dataset):
             same_direct += pre_same
 
         if pre_cnt ==0:
-            print('Eval No cnt: {}(p{}, n{})  ---  Pre_X: {})'.format(dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
-        else: print('Eval diff  = {:>.6}, cnt: {}({})/{}(p{}, n{})  ---   Pre_X: {})'.format(
+            print('TEST No cnt: {}(p{}, n{})  ---  Pre_X: {})'.format(dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
+        else: print('TEST diff: {:>.3}, cnt: {}({})/{}(p{}, n{})  ---   Pre_X: {})'.format(
             sum/pre_cnt, pre_cnt, cor_d_cnt, dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
     model.train()
 
@@ -205,19 +210,10 @@ def train(data, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    data = extractor.load_ml()
-    valid = data[-10:]
-    data = data[-15:-5]
+    t_data, valid, test, tri = extractor.load_trainset()
+    REF = DataSpec (t_data[0])
 
-
-    test = valid[:5]
-    valid = valid[5:]
-
-
-    REF = DataSpec (data[0])
-
-
-    data = DLoader(data, REF)
-    valid = DLoader(valid, REF, data.normalizer)
+    data = DLoader(t_data, REF)
     test = DLoader(test, REF, data.normalizer)
-    train(data,test, valid )
+    valid = DLoader(tri, REF, data.normalizer)
+    train(data,test, valid)

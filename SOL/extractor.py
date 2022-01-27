@@ -210,6 +210,27 @@ def load_ml():
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
     return all_days
 
+
+def load_trainset(size=100):
+    buff = 3
+    test_size = 3
+    all_idx = size + test_size + buff
+
+    all_data = load_ml()[-all_idx: -buff]
+    train = all_data[:-test_size]
+    test = train[-test_size:]
+    tri = all_data[-test_size:]
+    valid = test + tri
+    print("TRAIN on: {} DAYS".format(len(train)))
+    return train, valid, test, tri
+
+
+
+
+
+
+
+
 def load():
     all_days, feature_size,  all_days, feature_size, base_size = _load('transaction'
                  , ['st_dt', 'transaction','return5','m_diff' , 'open','high' , 'low'])

@@ -19,14 +19,7 @@ class BaseFeature(BaseFeaturesExtractor):
         return self.dense(observations)
 
 
-class LstmLast(nn.Module):
-    def __init__(self, seq_width, hidden):
-        super (LstmLast, self).__init__ ()
-        self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.2, hidden_size=hidden, batch_first=True)
-        # self.lstm = nn.LSTM (input_size=seq_width, hidden_size=hidden, batch_first=True)
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return out[:,-1]
+
 
 class SeqFeature(BaseFeaturesExtractor):
     def __init__(self, obs_space: gym.spaces.Box):
@@ -82,10 +75,9 @@ class CNN1(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, inch, widen=False, span=3):
-        outch = inch*2 if widen else inch
+    def __init__(self, inch, outch, span=3):
+        super(ResNet, self).__init__()
         inter = int(inch/2)
-        self.out_ch = outch
 
         self.conv = nn.Sequential(
             nn.Conv2d (inch, inter, kernel_size=1, stride=1),
@@ -106,7 +98,7 @@ class ResNet(nn.Module):
             nn.BatchNorm2d (outch))
 
 
-        if not widen: self.shortcut = nn.Sequential()
+        if inch==outch: self.shortcut = nn.Sequential()
         else: self.shortcut = nn.Sequential(
             nn.Conv2d (inch, outch, kernel_size=1, stride=1),
             nn.BatchNorm2d (outch))
@@ -125,48 +117,39 @@ class ResNet(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=12, span=3):
+    def __init__(self, seq_len, seq_width,  init_ch=12, out_ch=12, span=3):
         super (CNN, self).__init__ ()
-        span = min (seq_len, span)
 
-        # out_seq_len = (seq_len - layer_cnt*span*2 + layer_cnt*2)
-        # out_seq_len = seq_len - layer_cnt * (-span +1)
-
-        # assert out_seq_len > 1
-        # self.feature_concat_dim = seq_width * channels[-1]
-        # self.feature_dim = out_seq_len * self.feature_concat_dim
-        self.input = nn.Sequential(
-            nn.Unflatten(-2, (1, seq_len)),
+        network = [nn.Unflatten(-2, (1, seq_len)),
             nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (init_ch),
-            nn.Mish ())
-        self.res1 = ResNet(init_ch, False)
-        self.res12 = ResNet(self.res1.out_ch)
+            nn.Mish(), nn.Dropout(0.2)]
 
+        res_mulitple = [1, 1, 2]
+        res_inch = init_ch
+        for res in res_mulitple:
+            res_outch = res_inch* res
+            network.append(ResNet(res_inch, res_outch, span))
+            network.append(nn.Dropout(0.2))
+            res_inch = res_outch
 
-
-
-
-        cnns = []
-        in_dim = 1
-
-        for ch in channels:
-            cnns.extend(self.cnn_module(in_dim, ch, span))
-            in_dim = ch
-        self.cnn = nn.Sequential(*cnns)
-
-    def cnn_module(self, inch, outch, span):
-        return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
-            , nn.BatchNorm2d (outch)
-            , nn.Mish()
-            # , nn.MaxPool2d(kernel_size=(span, 1), stride=1)
-
-            , nn.Dropout(0.1)]
-
+        out_layer = [nn.Conv2d(res_outch, out_ch, kernel_size=1, stride=1),
+                     nn.BatchNorm2d(out_ch),
+                     nn.Mish()]
+        network.extend(out_layer)
+        self.network = nn.Sequential(*network)
+        self.feature_concat_dim = out_ch * seq_width
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.cnn(self.input(observations))
+        return self.network(observations)
 
-
+class LstmLast(nn.Module):
+    def __init__(self, seq_width, hidden):
+        super (LstmLast, self).__init__ ()
+        self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, dropout=0.1, hidden_size=hidden, batch_first=True)
+        # self.lstm = nn.LSTM (input_size=seq_width, num_layers=2, hidden_size=hidden, batch_first=True)
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return out[:,-1]
 
 class SeqCNN (BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
@@ -203,6 +186,7 @@ class SeqCRNN (BaseFeaturesExtractor):
 
         self.rnn = nn.Sequential (
             nn.Flatten (start_dim=-2),
+            nn.Dropout(0.1),
             LstmLast(seq_width=self.cnn.feature_concat_dim, hidden=out_dim),
             nn.Mish(),
         )

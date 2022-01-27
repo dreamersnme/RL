@@ -15,10 +15,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data = extractor.load_ml()
-data = data[-10:-3]
-valid = data[-5:]
-data = data[:-3]
+data, valid, _, _ = extractor.load_trainset()
 
 ENV = Days
 SPEC = DataSpec (data[0])

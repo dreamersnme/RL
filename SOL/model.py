@@ -74,7 +74,6 @@ class OutterModel(nn.Module):
             nn.Linear(dim1, dim2),
             nn.BatchNorm1d(dim2),
             nn.Mish(),
-            nn.Dropout(0.2)
         )
         self.price = nn.Linear (dim2, spec.price_len)
         self.direction =  nn.Sequential(
