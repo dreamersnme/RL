@@ -46,10 +46,10 @@ class SeqFeature(BaseFeaturesExtractor):
         return th.cat(encoded_tensor_list, dim=1)
 
 
-class CNN(nn.Module):
+class CNN1(nn.Module):
 
     def __init__(self, seq_len, seq_width,  channels=[3,5], span=2):
-        super (CNN, self).__init__ ()
+        super (CNN1, self).__init__ ()
 
         span = min (seq_len, span)
         layer_cnt = len(channels)
@@ -70,10 +70,98 @@ class CNN(nn.Module):
 
     def cnn_module(self, inch, outch, span):
         return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
+            , nn.BatchNorm2d (outch)
             , nn.Mish()
             # , nn.MaxPool2d(kernel_size=(span, 1), stride=1)
-            , nn.BatchNorm2d(outch)
+
             , nn.Dropout(0.2)]
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.cnn(self.input(observations))
+
+
+
+class ResNet(nn.Module):
+    def __init__(self, inch, widen=False, span=3):
+        outch = inch*2 if widen else inch
+        inter = int(inch/2)
+        self.out_ch = outch
+
+        self.conv = nn.Sequential(
+            nn.Conv2d (inch, inter, kernel_size=1, stride=1),
+            nn.BatchNorm2d (inter),
+            nn.Mish (),
+            nn.ZeroPad2d ((0, 0, span-1, 0)),
+            nn.Conv2d (inter, inter, kernel_size=(span, 1), stride=1),
+            nn.BatchNorm2d (inter),
+            nn.Mish (),
+            nn.Conv2d (inter, outch, kernel_size=1, stride=1),
+            nn.BatchNorm2d (outch)
+        )
+
+        self.maxpool = nn.Sequential(
+            nn.MaxPool2d (kernel_size=(span, 1), stride=1),
+            nn.ZeroPad2d ((0, 0, span - 1, 0)),
+            nn.Conv2d (inch, outch, kernel_size=1, stride=1),
+            nn.BatchNorm2d (outch))
+
+
+        if not widen: self.shortcut = nn.Sequential()
+        else: self.shortcut = nn.Sequential(
+            nn.Conv2d (inch, outch, kernel_size=1, stride=1),
+            nn.BatchNorm2d (outch))
+
+        self.act = nn.Mish()
+
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        conv = self.conv(observations)
+        maxpool =self.maxpool(observations)
+        shortcut = self.shortcut(observations)
+        return self.act(conv+maxpool+shortcut)
+
+
+
+
+class CNN(nn.Module):
+
+    def __init__(self, seq_len, seq_width,  init_ch=12, span=3):
+        super (CNN, self).__init__ ()
+        span = min (seq_len, span)
+
+        # out_seq_len = (seq_len - layer_cnt*span*2 + layer_cnt*2)
+        # out_seq_len = seq_len - layer_cnt * (-span +1)
+
+        # assert out_seq_len > 1
+        # self.feature_concat_dim = seq_width * channels[-1]
+        # self.feature_dim = out_seq_len * self.feature_concat_dim
+        self.input = nn.Sequential(
+            nn.Unflatten(-2, (1, seq_len)),
+            nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
+            nn.BatchNorm2d (init_ch),
+            nn.Mish ())
+        self.res1 = ResNet(init_ch, False)
+        self.res12 = ResNet(self.res1.out_ch)
+
+
+
+
+
+        cnns = []
+        in_dim = 1
+
+        for ch in channels:
+            cnns.extend(self.cnn_module(in_dim, ch, span))
+            in_dim = ch
+        self.cnn = nn.Sequential(*cnns)
+
+    def cnn_module(self, inch, outch, span):
+        return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
+            , nn.BatchNorm2d (outch)
+            , nn.Mish()
+            # , nn.MaxPool2d(kernel_size=(span, 1), stride=1)
+
+            , nn.Dropout(0.1)]
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.cnn(self.input(observations))
