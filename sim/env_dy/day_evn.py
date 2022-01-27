@@ -230,13 +230,13 @@ class Days(gym.Env):
 
     def cal_reward(self, pre_stat, new_stat, step_profit, pre_price):
 
-        returns = self.cal_emph_reward(step_profit)
-        risk = self.remain_risk(new_stat)
-        reward = returns #- 0.5 * risk #2틱 risk = 3$ 1틱 1.25
+        # returns = self.cal_emph_reward(step_profit)
+        # risk = self.remain_risk(new_stat)
+        # reward = returns #- 0.5 * risk #2틱 risk = 3$ 1틱 1.25
         # optimal = self.cal_opt_reward(step_profit, pre_stat, pre_price, new_stat)
 
         # reward += (max(optimal, -5))
-
+        reward = step_profit
         self.reward_log = np.append(self.reward_log, reward)
         return reward
 

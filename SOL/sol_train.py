@@ -17,7 +17,7 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.001
+learning_rate = 0.000001
 batch_size = 128
 num_classes = 10
 epochs = 2000

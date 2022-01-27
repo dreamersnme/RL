@@ -32,7 +32,7 @@ class FlushPipe(object):
 if __name__ == "__main__":
     # models = ["DDPG", "SAC", "TD3"]
     # models = ["DDPG", "TD3"]
-    models = ["TD3X", "TD3"]
+    models = ["DDPGX", "SACX", "SAC"]
 
     procs = []
 
