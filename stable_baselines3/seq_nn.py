@@ -125,12 +125,12 @@ class CNN(nn.Module):
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
 
-        res_mulitple = [1, 1, 2]
+        res_mulitple = [1, 2]
         res_inch = init_ch
         for res in res_mulitple:
             res_outch = res_inch* res
             network.append(ResNet(res_inch, res_outch, span))
-            network.append(nn.Dropout(0.2))
+            # network.append(nn.Dropout(0.2))
             res_inch = res_outch
 
         out_layer = [nn.Conv2d(res_outch, out_ch, kernel_size=1, stride=1),

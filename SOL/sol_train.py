@@ -17,10 +17,10 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.001
-batch_size = 1000
+learning_rate = 0.0005
+batch_size = 512
 num_classes = 10
-epochs = 2000
+epochs = 3000
 eval_interval = 10
 
 # def obs_as_tensor(
@@ -171,7 +171,7 @@ def train(data, testdata, validdatae):
     #
     #
     rmse = nn.MSELoss().to(device)
-    optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-5)
+    optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-4)
 
 
     start_tim = time.time()
