@@ -150,20 +150,24 @@ class CECK():
             print("SAVED: ", loss)
             self.best_loss = loss
 
-    def load(self, model):
+    def load(self, spec):
+
         try:
-            model.load_state_dict(th.load(self.file_name))
-            # print(model.state_dict())
+            model = OutterModel(spec).to(device)
+            # model.load_state_dict(th.load(self.file_name))
+            return model
         except:
             print("NEW MODEL")
-            pass
+            return OutterModel(spec).to(device)
 
 
 def train(data, testdata, validdatae):
     ckp = CECK()
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
-    model = OutterModel(data.spec).to(device)
-    ckp.load(model)
+    model = ckp.load(data.spec)
+
+
+    # ckp.load(model)
 
     model.train()
     # for param in model.module.parameters():
