@@ -117,7 +117,7 @@ class ResNet(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=12, out_ch=12, span=3):
+    def __init__(self, seq_len, seq_width,  init_ch=24, out_ch=24, span=3):
         super (CNN, self).__init__ ()
 
         network = [nn.Unflatten(-2, (1, seq_len)),
@@ -125,12 +125,12 @@ class CNN(nn.Module):
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
 
-        res_mulitple = [1, 2]
+        res_mulitple = [1, 2, 3,1]
         res_inch = init_ch
         for res in res_mulitple:
-            res_outch = res_inch* res
+            res_outch = init_ch* res
             network.append(ResNet(res_inch, res_outch, span))
-            # network.append(nn.Dropout(0.2))
+            network.append(nn.Dropout(0.1))
             res_inch = res_outch
 
         out_layer = [nn.Conv2d(res_outch, out_ch, kernel_size=1, stride=1),
