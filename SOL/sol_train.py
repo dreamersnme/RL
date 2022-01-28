@@ -210,7 +210,7 @@ def train(data, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    t_data, valid, test, tri = extractor.load_trainset()
+    t_data, valid, test, tri = extractor.load_trainset(10)
     REF = DataSpec (t_data[0])
 
     data = DLoader(t_data, REF)
