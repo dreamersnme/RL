@@ -65,7 +65,6 @@ class BaseMesh(nn.Module):
             nn.Mish()
         )
 
-
         self.crnn = SeqCRNN(obs_space, out_dim=outdim)
         self.features_dim = outdim
 
