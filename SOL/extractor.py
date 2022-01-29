@@ -206,7 +206,7 @@ def _load(target, trim ):
     return all_days, feature_size, base_size
 
 def load_ml():
-    all_days, feature_size, base_size = _load(['re1', 're2', 're3', 're4', 're5']
+    all_days, feature_size, base_size = _load(['re1', 're2', 're3']
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
     return all_days
 
