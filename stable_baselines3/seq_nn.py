@@ -7,18 +7,6 @@ from torchinfo import summary
 from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
 
 
-class BaseFeature(BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.Space, out_dim=16):
-        super(BaseFeature, self).__init__(observation_space, features_dim=out_dim)
-        in_dim = gym.spaces.utils.flatdim(observation_space)
-        self.dense = nn.Sequential(
-            nn.Linear(in_dim, out_dim),
-            nn.Mish()
-        )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.dense(observations)
-
 
 
 
@@ -186,7 +174,7 @@ class CNN(nn.Module):
             nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
-        res_mulitple = [2, 2, 4, 2]
+        res_mulitple = [1,2,3,1]
         res_inch = init_ch
         for res in res_mulitple:
             res_outch = init_ch* res

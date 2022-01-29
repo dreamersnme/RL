@@ -268,5 +268,5 @@ class CombinedExtractor (BaseFeaturesExtractor):
     def forward(self, observations: TensorDict) -> th.Tensor:
         feature = self.combined(observations)
         stat = self.stat(observations[STAT])
-        return  th.cat([feature, stat], dim=1)
+        return th.cat([feature, stat], dim=1)
 

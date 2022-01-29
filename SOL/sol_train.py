@@ -23,16 +23,6 @@ num_classes = 10
 epochs = 3000
 eval_interval = 10
 
-# def obs_as_tensor(
-#     obs: Union[np.ndarray, Dict[Union[str, int], np.ndarray]], device: th.device
-# ) -> Union[th.Tensor, TensorDict]:
-#     if isinstance(obs, th.Tensor):
-#         return obs.to(device)
-#     elif isinstance(obs, dict):
-#         return {key: _obs.to(device) for (key, _obs) in obs.items()}
-#     else:
-#         raise Exception(f"Unrecognized type of observation {type(obs)}")
-#
 
 
 def unit(arr, thre = 0.001):
@@ -112,6 +102,20 @@ def valall(model, dataset):
         print('Eval diff: {:>.3}'.format(sum/dataset.__len__()), "  S:", np.round(multi_sum/dataset.__len__(), 3))
     model.train()
 
+eval_rmse = nn.MSELoss().to(device)
+def val_loss(model, dataset):
+    model.eval()
+    test_loader = DataLoader(dataset, batch_size=1000)
+    with th.no_grad():
+        avg_loss = 0
+        for data, target, direction in test_loader:
+            target = th.cat([target, direction], dim=1)
+            hypothesis = model(data)
+            loss = eval_rmse(hypothesis, target)
+            avg_loss += loss / len(test_loader)
+        print('Loss Eval: {:>.4}'.format(avg_loss))
+    model.train()
+
 
 def val(model, dataset):
     model.eval()
@@ -136,7 +140,6 @@ def val(model, dataset):
         else: print('TEST diff: {:>.3}, cnt: {}({})/{}(p{}, n{})  ---   Pre_X: {})'.format(
             sum/pre_cnt, pre_cnt, cor_d_cnt, dataset.__len__(), dataset.pos_direct, dataset.neg_direct, same_direct))
     model.train()
-
 
 
 
@@ -166,14 +169,8 @@ def train(data, testdata, validdatae):
     train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
     model = ckp.load(data.spec)
 
-
-    # ckp.load(model)
-
     model.train()
-    # for param in model.module.parameters():
-    #     param.requires_grad = False
-    #
-    #
+
     rmse = nn.MSELoss().to(device)
     optimizer = th.optim.Adam(model.parameters(), lr=learning_rate,  weight_decay=1e-4)
 
@@ -183,9 +180,7 @@ def train(data, testdata, validdatae):
     for epoch in range(epochs):  # epochs수만큼 반복
         avg_loss = 0
         for data, target, direction in train_loader:
-            # data = obs_as_tensor(data, device)
-            # target = obs_as_tensor(target, device)
-            # direction = obs_as_tensor (direction, device)
+
             target = th.cat([target, direction], dim=1)
             optimizer.zero_grad()
             hypothesis = model(data)
@@ -202,15 +197,12 @@ def train(data, testdata, validdatae):
 
             print('==== [Epoch: {:>4}] loss = {:>.9}'.format(epoch + 1, avg_loss), int(now-start_tim))
             print("==== VALID (overlap, all) ===")
-            val(model, testdata)
-            val(model, validdatae)
             valall(model, testdata)
             valall(model, validdatae)
+            val_loss(model, testdata)
+            val_loss(model, validdatae)
             start_tim = now
 
-
-    # test
-     # evaluate mode로 전환 dropout 이나 batch_normalization 해제
 
 
 if __name__ == '__main__':

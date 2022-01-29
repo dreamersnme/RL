@@ -15,7 +15,7 @@ DIRECT = "direct"
 DEVICE ="cuda"
 class DLoader(Dataset):
     epsilon: float = 1e-8
-    thresold = 0.08
+    thresold = 0.12
 
     def __init__(self, data, spec, normalizer = None):
         self.data = data

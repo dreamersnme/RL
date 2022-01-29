@@ -11,7 +11,23 @@ from talib import abstract
 from CONFIG import *
 
 from stable_baselines3.common.type_aliases import TensorDict
-from stable_baselines3.seq_nn import SeqFeature, BaseFeature, SeqLstm, SeqCRNN, SeqCNN
+from stable_baselines3.seq_nn import SeqFeature, SeqLstm, SeqCRNN, SeqCNN
+
+
+class BaseFeature(nn.Module):
+    def __init__(self, observation_space: gym.Space, out_dim=16):
+        super(BaseFeature, self).__init__(observation_space, features_dim=out_dim)
+        in_dim = gym.spaces.utils.flatdim(observation_space)
+        self.dense = nn.Sequential(
+            nn.Linear(in_dim, out_dim),
+            nn.Mish()
+        )
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.dense(observations)
+
+
+
 
 class RMSELoss(nn.Module):
     def __init__(self):
@@ -34,8 +50,31 @@ class ObsNN(nn.Module):
         parallels = [P(observations) for P in self.parallels]
         return th.cat(parallels, dim=1)
 
-class TaNN(ObsNN):
-    pass
+
+
+class BaseMesh(nn.Module):
+    def __init__(self, obs_space, base_space):
+        super(BaseMesh,self).__init__()
+        outdim: int = 32
+        obs_width = obs_space.shape[-1]
+        base_width = base_space.shape[-1]
+        all_width = obs_width+base_width
+        self.dense = nn.Sequential(
+            nn.Linear(all_width, obs_width),
+            nn.BatchNorm1d(obs_width),
+            nn.Mish()
+        )
+
+
+        self.crnn = SeqCRNN(obs_space, out_dim=outdim)
+        self.features_dim = outdim
+
+    def forward(self, obs: th.Tensor, base: th.Tensor) -> th.Tensor:
+        unstack = th.unbind(obs, dim=1)
+        out = [self.dense(th.concat( (row, base), dim=1)) for row in unstack]
+        stack = th.stack(out)
+        stack = stack.transpose(0,1)
+        return self.crnn(stack)
 
 
 class CombinedModel(nn.Module):
@@ -47,14 +86,13 @@ class CombinedModel(nn.Module):
         self.features_dim = total_concat_size
 
     def get_dict(self, observation_space):
-        return {OBS: ObsNN (observation_space.spaces[OBS])
-            , TA: TaNN (observation_space.spaces[TA])
-            , BASE: BaseFeature (observation_space[BASE], out_dim=4)}
+        return {OBS: BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE])
+            , TA: BaseMesh (observation_space.spaces[TA], observation_space.spaces[BASE])}
 
     def forward(self, observations: TensorDict) -> th.Tensor:
         encoded_tensor_list = []
         for key, extractor in self.extractors.items ():
-            encoded_tensor_list.append (extractor (observations[key]))
+            encoded_tensor_list.append (extractor(observations[key], observations[BASE]))
         return th.cat (encoded_tensor_list, dim=1)
 
 
