@@ -183,7 +183,8 @@ def _load(target, trim ):
         obs_cols = [ 'open','high' , 'low','mm', 'close', 'volume', 'HL']
         ta_cols = [i for i in df.columns if i not in obs_cols]
 
-        obs = df[obs_cols]
+        # obs = df[obs_cols]
+        obs=df
         ta = df[ta_cols]
 
         all_days.append(Day(st_dt, obs.to_numpy().astype(np.float32)

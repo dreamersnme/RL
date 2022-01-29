@@ -16,12 +16,13 @@ from stable_baselines3.seq_nn import SeqFeature, SeqLstm, SeqCRNN, SeqCNN
 
 class BaseFeature(nn.Module):
     def __init__(self, observation_space: gym.Space, out_dim=16):
-        super(BaseFeature, self).__init__(observation_space, features_dim=out_dim)
+        super(BaseFeature, self).__init__()
         in_dim = gym.spaces.utils.flatdim(observation_space)
         self.dense = nn.Sequential(
             nn.Linear(in_dim, out_dim),
             nn.Mish()
         )
+        self.features_dim=out_dim
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.dense(observations)
@@ -53,9 +54,9 @@ class ObsNN(nn.Module):
 
 
 class BaseMesh(nn.Module):
-    def __init__(self, obs_space, base_space):
+    def __init__(self, obs_space, base_space,out_dim: int = 64 ):
         super(BaseMesh,self).__init__()
-        outdim: int = 32
+
         obs_width = obs_space.shape[-1]
         base_width = base_space.shape[-1]
         all_width = obs_width+base_width
@@ -65,8 +66,8 @@ class BaseMesh(nn.Module):
             nn.Mish()
         )
 
-        self.crnn = SeqCRNN(obs_space, out_dim=outdim)
-        self.features_dim = outdim
+        self.crnn = SeqCRNN(obs_space, out_dim=out_dim)
+        self.features_dim = out_dim
 
     def forward(self, obs: th.Tensor, base: th.Tensor) -> th.Tensor:
         unstack = th.unbind(obs, dim=1)
@@ -79,20 +80,15 @@ class BaseMesh(nn.Module):
 class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
         super (CombinedModel, self).__init__ ()
-        extractors = self.get_dict(observation_space)
-        total_concat_size = sum ([module.features_dim for module in extractors.values()])
-        self.extractors = nn.ModuleDict (extractors)
-        self.features_dim = total_concat_size
+        self.obs = BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE], out_dim=64)
+        self.base = BaseFeature(observation_space.spaces[BASE], out_dim=8)
 
-    def get_dict(self, observation_space):
-        return {OBS: BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE])
-            , TA: BaseMesh (observation_space.spaces[TA], observation_space.spaces[BASE])}
+        self.features_dim = self.obs.features_dim + self.base.features_dim
 
     def forward(self, observations: TensorDict) -> th.Tensor:
-        encoded_tensor_list = []
-        for key, extractor in self.extractors.items ():
-            encoded_tensor_list.append (extractor(observations[key], observations[BASE]))
-        return th.cat (encoded_tensor_list, dim=1)
+        obs = self.obs(observations[OBS], observations[BASE])
+        base = self.base(observations[BASE])
+        return th.cat ([obs, base], dim=1)
 
 
 
@@ -120,4 +116,4 @@ class OutterModel(nn.Module):
     def forward(self, observations: TensorDict) -> th.Tensor:
         feature = self.module(observations)
         agg = self.agg(feature)
-        return  th.cat([self.price(agg), self.direction(agg)], dim=1)
+        return th.cat([self.price(agg), self.direction(agg)], dim=1)
