@@ -1,5 +1,6 @@
 
 import gym
+import numpy as np
 import torch as th
 from torch import nn
 from torchinfo import summary
@@ -64,14 +65,14 @@ class CNN1(nn.Module):
 
 
 
-class LstmLast(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super (LstmLast, self).__init__ ()
-        # self.lstm = nn.LSTM (input_size=input_size, num_layers=2, dropout=0.1, hidden_size=hidden_size, batch_first=True)
-        self.lstm = nn.LSTM (input_size=input_size, hidden_size=hidden_size, batch_first=True)
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return out[:,-1]
+# class LstmLast(nn.Module):
+#     def __init__(self, input_size, hidden_size):
+#         super (LstmLast, self).__init__ ()
+#         # self.lstm = nn.LSTM (input_size=input_size, num_layers=2, dropout=0.1, hidden_size=hidden_size, batch_first=True)
+#         self.lstm = nn.LSTM (input_size=input_size, hidden_size=hidden_size, batch_first=True)
+#     def forward(self, x):
+#         out, _ = self.lstm(x)
+#         return out[:,-1]
 
 
 
@@ -109,18 +110,6 @@ class SeqCNN (BaseFeaturesExtractor):
         ss = self.cnn(observations)
         return self.flatten(ss)
 
-class SeqLstm (BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
-        super (SeqLstm, self).__init__ (observation_space, features_dim=out_dim)
-        seq_width = observation_space.shape[1]
-        self.lstm = nn.Sequential(
-            LstmLast (input_size=seq_width, hidden_size=out_dim),
-            nn.Mish(),
-        )
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.lstm(observations)
-
 
 
 RES =True
@@ -128,13 +117,16 @@ RES =True
 class ResNet(nn.Module):
     def __init__(self, inch, outch, span=3):
         super(ResNet, self).__init__()
-        inter = int(inch/4)
+        inter = int(inch/3
 
+
+                    )
+        self.reduce_seq = span-1
         self.conv = nn.Sequential(
             nn.Conv2d (inch, inter, kernel_size=1, stride=1),
             nn.BatchNorm2d (inter),
             nn.Mish (),
-            nn.ZeroPad2d ((0, 0, span-1, 0)),
+            # nn.ZeroPad2d ((0, 0, span-1, 0)),
             nn.Conv2d (inter, inter, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (inter),
             nn.Mish (),
@@ -144,7 +136,7 @@ class ResNet(nn.Module):
 
         self.maxpool = nn.Sequential(
             nn.MaxPool2d (kernel_size=(span, 1), stride=1),
-            nn.ZeroPad2d ((0, 0, span - 1, 0)),
+            # nn.ZeroPad2d ((0, 0, span - 1, 0)),
             nn.Conv2d (inch, outch, kernel_size=1, stride=1),
             nn.BatchNorm2d (outch))
 
@@ -159,7 +151,7 @@ class ResNet(nn.Module):
     def forward(self, observations: th.Tensor) -> th.Tensor:
         conv = self.conv(observations)
         maxpool =self.maxpool(observations)
-        shortcut = self.shortcut(observations)
+        shortcut = self.shortcut(observations)[:,:,self.reduce_seq:]
         return self.act(conv+maxpool+shortcut)
 
 
@@ -167,20 +159,25 @@ class ResNet(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=24, out_ch=24, span=3):
+    def __init__(self, seq_len, seq_width,  init_ch=12, out_ch=24, span=3):
         super (CNN, self).__init__ ()
 
         network = [nn.Unflatten(-2, (1, seq_len)),
             nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
-        res_mulitple = [1,2,3,1]
+        res_mulitple = [1,2,3,4]
+
         res_inch = init_ch
+        req_reduce_sum = span -1
         for res in res_mulitple:
             res_outch = init_ch* res
-            network.append(ResNet(res_inch, res_outch, span))
+            resnet = ResNet(res_inch, res_outch, span)
+            req_reduce_sum += resnet.reduce_seq
+            network.append(resnet)
             network.append(nn.Dropout(0.2))
             res_inch = res_outch
+
 
         out_layer = [nn.Conv2d(res_outch, out_ch, kernel_size=1, stride=1),
                      nn.BatchNorm2d(out_ch),
@@ -188,9 +185,15 @@ class CNN(nn.Module):
         network.extend(out_layer)
         self.network = nn.Sequential(*network)
         self.feature_concat_dim = out_ch * seq_width
-        self.seq = seq_len - span +1
+        self.seq = seq_len - req_reduce_sum
+
+
+        self.vstack = nn.Flatten(start_dim=-2)
+        summary(self, (1, seq_len, seq_width))
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.network(observations)
+        cc = self.network(observations)
+        cc = th.transpose(cc, dim0=-3, dim1=-2)
+        return self.vstack(cc)
 
 class SeqCRNN (BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
@@ -201,32 +204,45 @@ class SeqCRNN (BaseFeaturesExtractor):
         self.cnn = CNN(seq_len, seq_width)
 
         input_size = self.cnn.feature_concat_dim
-        # inter1 =  int((input_size + out_dim)/2)
-        inter=[128, 64, out_dim]
-        self.rnn = nn.Sequential (
-            nn.Flatten (start_dim=-2),
-            * self.inter_lstm (self.cnn.seq, input_size, inter),
-            nn.Flatten()
-        )
-        summary (self, (1, seq_len, seq_width))
+        out_seq = self.cnn.seq
 
-    def inter_lstm(self, in_seq, input_size, inter):
-        layers = []
-        last = inter[-1]
-        inter = inter[:-1]
-        for hidden in inter:
-            out_seq = in_seq  if hidden > input_size else max(3, int(in_seq*0.7))
-            layers.append(nn.Dropout (0.2))
-            layers.append (LstmLast (input_size=input_size, hidden_size=hidden, last_seq = out_seq))
-            input_size = hidden
-            in_seq = out_seq
+        self.rnn = SeqLstm(out_seq, input_size, out_dim)
 
-        layers.append (nn.Dropout (0.2))
-        layers.append (LstmLast (input_size=input_size, hidden_size=last, last_seq=1))
-        return layers
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         cc = self.cnn(observations)
-        cc = th.transpose(cc, dim0=-3, dim1=-2)
         return self.rnn(cc)
+
+
+class SeqLstm (nn.Module):
+    def __init__(self, seq, input_dim, layer_num=3, out_seq=1, out_dim: int = 64):
+        super (SeqLstm, self).__init__ ( )
+        hiddens = np.linspace(out_dim, min(256,input_dim), layer_num, endpoint=False).astype(int).tolist()
+        hiddens.reverse()
+        seq_reduction = np.linspace(out_seq, seq, layer_num, endpoint=False).astype(int).tolist()
+        seq_reduction.reverse()
+        print(hiddens)
+        print(seq_reduction)
+
+        layers = self.inter_lstm (input_dim, hiddens, seq_reduction)
+        if out_seq==1: layers.append(nn.Flatten())
+        self.lstm = nn.Sequential (*layers)
+
+        self.features_dim = out_dim
+        summary(self, (1, seq, input_dim))
+
+    def inter_lstm(self, input_size, hiddens, seq_reduction):
+        layers = []
+        for h, s in zip(hiddens, seq_reduction):
+            layers.append(nn.Dropout (0.4))
+            layers.append (LstmLast (input_size=input_size, hidden_size=h, last_seq = s))
+            input_size = h
+
+
+
+        return layers
+
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return self.lstm(observations)
 
