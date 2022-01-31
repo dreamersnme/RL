@@ -163,7 +163,7 @@ class CNN(nn.Module):
             nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
-        res_mulitple = [1,2,4,6,6]
+        res_mulitple = [1,2,4,5,6]
 
         res_inch = init_ch
         req_reduce_sum = span -1
@@ -218,8 +218,6 @@ class SeqLstm (nn.Module):
         hiddens.reverse()
         seq_reduction = np.linspace(out_seq, seq, layer_num, endpoint=False).astype(int).tolist()
         seq_reduction.reverse()
-        print(hiddens)
-        print(seq_reduction)
 
         layers = self.inter_lstm (input_dim, hiddens, seq_reduction)
         if out_seq==1: layers.append(nn.Flatten())
@@ -231,11 +229,9 @@ class SeqLstm (nn.Module):
     def inter_lstm(self, input_size, hiddens, seq_reduction):
         layers = []
         for h, s in zip(hiddens, seq_reduction):
-            layers.append(nn.Dropout (0.4))
+            layers.append(nn.Dropout (0.2))
             layers.append (LstmLast (input_size=input_size, hidden_size=h, last_seq = s))
             input_size = h
-
-
 
         return layers
 
