@@ -92,8 +92,8 @@ class BaseMesh(nn.Module):
         self.cnn = CNN(seq_len, seq_width)
 
         self.base_seq = 4
-        mid_out = out_dim*2
-        self.rnn1 = SeqLstm(self.cnn.seq, self.cnn.feature_concat_dim, layer_num=2, out_seq=4, out_dim=mid_out)
+        mid_out = out_dim*4
+        self.rnn1 = SeqLstm(self.cnn.seq, self.cnn.feature_concat_dim, layer_num=1, out_seq=4, out_dim=mid_out)
         self.unflat = nn.Unflatten(-1, (self.base_seq, base_width))
         self.rnn2 = SeqLstm(self.base_seq, mid_out+base_width, layer_num=1, out_seq=1, out_dim=out_dim)
         self.features_dim = out_dim
@@ -110,7 +110,7 @@ class BaseMesh(nn.Module):
 class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
         super (CombinedModel, self).__init__ ()
-        self.obs = BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE], out_dim=32)
+        self.obs = BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE], out_dim=64)
 
         seq = observation_space.spaces[OBS].shape[0]
         width = observation_space.spaces[OBS].shape[1]
