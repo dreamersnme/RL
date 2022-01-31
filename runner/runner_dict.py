@@ -21,11 +21,11 @@ ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 1
+    BOOST_SEARCH = 5
     unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
-    noise_std = 0.6
+    noise_std = 0.4
     adapt_delay = 15
 
     def __init__(self, MODEL, TRANSFER = None, arc=[128, 64], retrain=False, batch_size=128, seed=None):
