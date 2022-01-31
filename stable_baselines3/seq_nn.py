@@ -117,10 +117,7 @@ RES =True
 class ResNet(nn.Module):
     def __init__(self, inch, outch, span=3):
         super(ResNet, self).__init__()
-        inter = int(inch/3
-
-
-                    )
+        inter = int(inch/3)
         self.reduce_seq = span-1
         self.conv = nn.Sequential(
             nn.Conv2d (inch, inter, kernel_size=1, stride=1),
@@ -159,14 +156,14 @@ class ResNet(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=12, out_ch=24, span=2):
+    def __init__(self, seq_len, seq_width,  init_ch=4, out_ch=16, span=2):
         super (CNN, self).__init__ ()
 
         network = [nn.Unflatten(-2, (1, seq_len)),
             nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
             nn.BatchNorm2d (init_ch),
             nn.Mish(), nn.Dropout(0.2)]
-        res_mulitple = [1,2,3,3]
+        res_mulitple = [1,2,4,6,6]
 
         res_inch = init_ch
         req_reduce_sum = span -1
