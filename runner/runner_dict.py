@@ -15,20 +15,20 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data, valid, _, _ = extractor.load_trainset()
+data, valid, _, _ = extractor.load_trainset(10)
 
 ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
-    BOOST_SEARCH = 5
+    BOOST_SEARCH = 1
     unit_episode = len(data)
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.4
-    adapt_delay = 15
+    adapt_delay = 25
 
-    def __init__(self, MODEL, TRANSFER = None, arc=[128, 64], retrain=False, batch_size=128, seed=None):
+    def __init__(self, MODEL, TRANSFER = None, arc=[256, 128], retrain=False, batch_size=64, seed=None):
         self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
 
         self.seed = seed

@@ -17,7 +17,7 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.0005
+learning_rate = 0.00001
 batch_size = 512
 num_classes = 10
 epochs = 3000
@@ -157,7 +157,7 @@ class CECK():
 
         try:
             model = OutterModel(spec).to(device)
-            # model.load_state_dict(th.load(self.file_name))
+            model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
