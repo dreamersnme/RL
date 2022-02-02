@@ -144,27 +144,8 @@ def save():
     print("-------------ADJ---------------")
     print(adj_df.head(3))
 
-Day = namedtuple('day', ['dt', OBS, TA, BASE, PRICE])
-def load_ori():
-    ql = "select * from data_19_28"
-    df = pd.read_sql_query (ql, conn)
-    grouped = df.groupby('st_dt')
-    days =  [ group.reset_index(drop=True) for _, group in grouped]
+Day = namedtuple('day', ['dt', OBS, BASE, PRICE])
 
-
-    all_days =[]
-    for df in days:
-        del df['st_dt']
-        del df['return5']
-        del df['m_diff']
-        price = df['transaction']
-        del df['transaction']
-        all_days.append(Day(df.to_numpy(), price.to_numpy()))
-    feature_size = len(days[0].columns)
-
-    print(feature_size)
-    print(days[0].head(3))
-    return all_days, feature_size
 
 def _load(target, trim ):
     ql = "select * from adj_19_28"
@@ -175,41 +156,28 @@ def _load(target, trim ):
     all_days =[]
 
     for (st_dt, df) in days:
-        price = df[target]
+        price = df[target].to_numpy().astype(np.float32)
         df =df.drop (columns=trim)
         ql = f"select * from base_19_28 where st_dt = '{st_dt}'"
         base = pd.read_sql_query(ql, conn)
         base = base.drop(columns=[ 'st_dt', 'close_mean',  'close_std',  'close_min',  'close_max'])
-        obs_cols = [ 'open','high' , 'low','mm', 'close', 'volume', 'HL']
-        ta_cols = [i for i in df.columns if i not in obs_cols]
+        base1 = base.to_numpy()[0]
+        base = np.repeat(base1.reshape(1,-1), repeats=len(df), axis=0)
+        obs=np.concatenate((df, base), axis=-1)
 
-        # obs = df[obs_cols]
-        obs=df
-        ta = df[ta_cols]
 
-        all_days.append(Day(st_dt, obs.to_numpy().astype(np.float32)
-                            , ta.to_numpy().astype(np.float32)
-                            , base.to_numpy().astype(np.float32)[0]
-                            , price.to_numpy().astype(np.float32)))
+        all_days.append(Day(st_dt, obs.astype(np.float32)
+                            , base1.astype(np.float32)
+                            , price))
     for i in range(len(all_days)-1): assert all_days[i].dt < all_days[i+1].dt
-    feature_size = len(df.columns)
-    base_size = len(base.columns)
-
-    print(feature_size, base_size)
-    print("-----OBS")
-    print(obs.head(2))
-    print("-----TA")
-    print(ta.head(2))
-    print("-----BASE")
-    print(base.head())
-    print("-----PRICE")
-    print(price.head(2))
-    return all_days, feature_size, base_size
+    print(obs.shape)
+    print(base1.shape)
+    print(price.shape)
+    return all_days
 
 def load_ml():
-    all_days, feature_size, base_size = _load(['re1', 're2', 're3']
+    return  _load(['re1', 're2', 're3']
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
-    return all_days
 
 
 def load_trainset(size=100):
@@ -225,33 +193,6 @@ def load_trainset(size=100):
     print("TRAIN on: {} DAYS".format(len(train)))
     return train, valid, test, tri
 
-
-
-
-
-
-
-
-def load():
-    all_days, feature_size,  all_days, feature_size, base_size = _load('transaction'
-                 , ['st_dt', 'transaction','return5','m_diff' , 'open','high' , 'low'])
-    TRAIN, _, TEST = split(all_days)
-    return TRAIN, TEST
-
-def split(all_days):
-    idxes = list(range(len(all_days)))
-    # e_day = idxes[-5:]
-    # extra = [3,10,14,17]
-    # e_day = list(set(extra+e_day))
-    # t_day = [i for i in idxes if i not in e_day]
-    t_day = idxes[:-5]
-    e_day = idxes[-8:]
-    print("TAIN ON:",t_day)
-    print("TEST ON:", e_day)
-
-    train = [all_days[i] for i in t_day]
-    test = [all_days[i] for i in e_day]
-    return train, len(train), test
 
 
 if __name__ == '__main__':

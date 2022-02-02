@@ -9,74 +9,6 @@ from stable_baselines3.common.torch_layer_base import BaseFeaturesExtractor
 
 
 
-
-
-class SeqFeature(BaseFeaturesExtractor):
-    def __init__(self, obs_space: gym.spaces.Box):
-        super (SeqFeature, self).__init__ (obs_space, features_dim=1)
-        extractors =[ SeqCRNN(obs_space, 64)]
-        total_concat_size = 0
-        for ex in extractors:
-            total_concat_size += ex._features_dim
-        self._features_dim = total_concat_size
-
-        self.extractors = nn.ModuleList (extractors)
-
-    def forward(self, obs: th.Tensor) -> th.Tensor:
-        encoded_tensor_list = []
-        for ext in self.extractors:
-            encoded_tensor_list.append(ext(obs))
-        return th.cat(encoded_tensor_list, dim=1)
-
-
-class CNN1(nn.Module):
-
-    def __init__(self, seq_len, seq_width,  channels=[3,5], span=2):
-        super (CNN1, self).__init__ ()
-
-        span = min (seq_len, span)
-        layer_cnt = len(channels)
-        # out_seq_len = (seq_len - layer_cnt*span*2 + layer_cnt*2)
-        out_seq_len = seq_len - layer_cnt * (-span +1)
-
-        assert out_seq_len > 1
-        self.feature_concat_dim = seq_width * channels[-1]
-        self.feature_dim = out_seq_len * self.feature_concat_dim
-        self.input = nn.Unflatten(-2, (1, seq_len))
-        cnns = []
-        in_dim = 1
-
-        for ch in channels:
-            cnns.extend(self.cnn_module(in_dim, ch, span))
-            in_dim = ch
-        self.cnn = nn.Sequential(*cnns)
-
-    def cnn_module(self, inch, outch, span):
-        return [nn.Conv2d(inch, outch, kernel_size=(span, 1), stride=1)
-            , nn.BatchNorm2d (outch)
-            , nn.Mish()
-            # , nn.MaxPool2d(kernel_size=(span, 1), stride=1)
-
-            , nn.Dropout(0.2)]
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.cnn(self.input(observations))
-
-
-
-
-# class LstmLast(nn.Module):
-#     def __init__(self, input_size, hidden_size):
-#         super (LstmLast, self).__init__ ()
-#         # self.lstm = nn.LSTM (input_size=input_size, num_layers=2, dropout=0.1, hidden_size=hidden_size, batch_first=True)
-#         self.lstm = nn.LSTM (input_size=input_size, hidden_size=hidden_size, batch_first=True)
-#     def forward(self, x):
-#         out, _ = self.lstm(x)
-#         return out[:,-1]
-
-
-
-
 class LstmLast(nn.Module):
     def __init__(self, input_size, hidden_size, last_seq):
         super (LstmLast, self).__init__ ()
@@ -87,28 +19,6 @@ class LstmLast(nn.Module):
         out, _ = self.lstm(x)
         if self.last_seq is None : return out
         else: return out[:,-self.last_seq:]
-
-
-class LstmOut(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super (LstmOut, self).__init__ ()
-        self.lstm = nn.LSTM (input_size=input_size, hidden_size=hidden_size, batch_first=True)
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return out
-
-class SeqCNN (BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
-        super (SeqCNN, self).__init__ (observation_space, features_dim=out_dim)
-        seq_len = observation_space.shape[0]
-        seq_width = observation_space.shape[1]
-        self.cnn = CNN(seq_len, seq_width)
-        self.flatten = nn.Sequential (
-            nn.Flatten (start_dim=1), nn.Linear (self.cnn.feature_dim, out_dim), nn.Mish ())
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        ss = self.cnn(observations)
-        return self.flatten(ss)
 
 
 
@@ -153,38 +63,47 @@ class ResNet(nn.Module):
 class Incept(nn.Module):
     def __init__(self, inch, outch):
         super(Incept, self).__init__()
+        layer = 3
         inter_out = outch
-        each = int(inter_out/4)
-        denseout = inter_out - each*3
+        each = int(inter_out/layer)
+        each_in = int(each/2)
+        denseout = inter_out - each*(layer-1)
+
 
         self.dense = nn.Sequential(
-            nn.Conv2d(inch, denseout, kernel_size=1, stride=1),
-            nn.BatchNorm2d(denseout), nn.Mish ())
+            nn.Conv1d(inch, denseout, kernel_size=1, stride=1),
+            nn.BatchNorm1d(denseout), nn.Mish ())
 
-        self.reduce_seq = 2
         self.conv2 = nn.Sequential(
-            nn.Conv2d (inch, each, kernel_size=1, stride=1),
-            nn.BatchNorm2d (each),
+            nn.Conv1d (inch, each_in, kernel_size=1, stride=1),
+            nn.BatchNorm1d (each_in),
             nn.Mish (),
-            nn.Conv2d (each, each, kernel_size=(2, 1), stride=1),
-            nn.BatchNorm2d (each),
+            nn.Conv1d (each_in, each, kernel_size=2, stride=1),
+            nn.BatchNorm1d (each),
             nn.Mish ()
         )
         self.reduce_seq = 2
         self.conv3 = nn.Sequential(
-            nn.Conv2d (inch, each, kernel_size=1, stride=1),
-            nn.BatchNorm2d (each),
+            nn.Conv1d (inch, each_in, kernel_size=1, stride=1),
+            nn.BatchNorm1d (each_in),
             nn.Mish (),
-            nn.Conv2d (each, each, kernel_size=(3, 1), stride=1),
-            nn.BatchNorm2d (each),
+            nn.Conv1d (each_in, each, kernel_size=3, stride=1),
+            nn.BatchNorm1d (each),
             nn.Mish ()
         )
 
-        self.maxpool = nn.Sequential(
-            nn.MaxPool2d (kernel_size=(3, 1), stride=1),
-            nn.Conv2d (inch, each, kernel_size=1, stride=1),
-            nn.BatchNorm2d (each),
-            nn.Mish ())
+        # self.maxpool = nn.Sequential(
+        #     nn.MaxPool1d (kernel_size=3, stride=1),
+        #     nn.Conv1d (inch, each, kernel_size=1, stride=1),
+        #     nn.BatchNorm1d (each),
+        #     nn.Mish ())
+        #
+        #
+        # self.minpool = nn.Sequential(
+        #     nn.MaxPool1d (kernel_size=3, stride=1),
+        #     nn.Conv1d (inch, each, kernel_size=1, stride=1),
+        #     nn.BatchNorm1d (each),
+        #     nn.Mish ())
 
         # self.out = nn.Sequential( nn.Conv2d (inter_out, outch, kernel_size=1, stride=1),
         #     nn.BatchNorm2d (outch),
@@ -192,11 +111,15 @@ class Incept(nn.Module):
 
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
+
         dense = self.dense(observations[:, :,self.reduce_seq:])
         conv2 = self.conv2(observations[:, :,1:])
         conv3 = self.conv3(observations)
-        maxpool =self.maxpool(observations)
-        cat  = th.concat([dense, conv2,conv3,maxpool], dim=1)
+        return th.concat([dense, conv2, conv3], dim=1)
+        # maxpool =self.maxpool(observations)
+        # avgpoll = self.avgpoll(observations)
+        # minpool = -self.minpool(-observations)
+        # cat  = th.concat([dense, conv2,conv3,maxpool, minpool], dim=1)
         return cat
         # return self.out(cat)
 
@@ -204,19 +127,14 @@ class Incept(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=2):
+    def __init__(self, seq_len, init_ch):
         super (CNN, self).__init__ ()
-
-        network = [nn.Unflatten(-2, (1, seq_len)),
-            nn.Conv2d (1, init_ch, kernel_size=1, stride=1),
-            nn.BatchNorm2d (init_ch),
-            nn.Mish()]
-        res_mulitple = [4,6,8,10,10]
-
+        network = []
+        res_mulitple = [5,10,15,20,10]
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
-            res_outch = init_ch* res
+            res_outch = int(init_ch* res)
             resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
             network.append(nn.Dropout(0.2))
@@ -224,37 +142,17 @@ class CNN(nn.Module):
             res_inch = res_outch
 
         self.network = nn.Sequential(*network)
-        self.feature_concat_dim = res_mulitple[-1]*init_ch  * seq_width
+        self.feature_concat_dim = res_mulitple[-1]*init_ch
         self.seq = seq_len - req_reduce_sum
-
-
-        self.vstack = nn.Flatten(start_dim=-2)
-        summary(self, (1, seq_len, seq_width))
+        summary(self, (1, seq_len, init_ch))
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        cc = self.network(observations)
-        cc = th.transpose(cc, dim0=-3, dim1=-2)
-        return self.vstack(cc)
-
-class SeqCRNN (BaseFeaturesExtractor):
-    def __init__(self, observation_space: gym.spaces.Box, out_dim: int = 64):
-        super (SeqCRNN, self).__init__ (observation_space, features_dim=out_dim)
-
-        seq_len = observation_space.shape[0]
-        seq_width = observation_space.shape[1]
-        self.cnn = CNN(seq_len, seq_width)
-
-        input_size = self.cnn.feature_concat_dim
-        out_seq = self.cnn.seq
-
-        self.rnn = SeqLstm(out_seq, input_size, out_dim)
-
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        cc = self.cnn(observations)
-        return self.rnn(cc)
+        return self.network(observations.transpose(-2, -1)).transpose(-2, -1)
 
 
 class SeqLstm (nn.Module):
+
+
+
     def __init__(self, seq, input_dim, layer_num=3, out_seq=1, out_dim: int = 64):
         super (SeqLstm, self).__init__ ( )
         hiddens = np.linspace(out_dim, min(256,input_dim), layer_num, endpoint=False).astype(int).tolist()
@@ -275,7 +173,6 @@ class SeqLstm (nn.Module):
             layers.append(nn.Dropout (0.2))
             layers.append (LstmLast (input_size=input_size, hidden_size=h, last_seq = s))
             input_size = h
-
         return layers
 
 

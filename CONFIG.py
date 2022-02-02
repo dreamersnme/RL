@@ -15,7 +15,6 @@ STAT = "stat"
 OBS ="obs"
 BASE = 'base'
 PRICE = "price"
-TA ='ta'
 DIRECT = "direct"
 DEVICE ="cuda"
 INPUT_SET =[STAT, BASE, OBS]
@@ -30,13 +29,11 @@ class DataSpec:
     stat_len = 2
     def __init__(self, ref):
         self.obs_len = ref.obs.shape[1]
-        self.ta_len = ref.ta.shape[1]
         self.base_len = ref.base.shape[0]
         self.price_len = ref.price.shape[1]
 
         obs = spaces.Box (low=-np.inf, high=np.inf, shape=(self.obs_seq, self.obs_len))
-        ta = spaces.Box (low=-np.inf, high=np.inf, shape=(self.ta_seq, self.ta_len))
         base = spaces.Box (low=-np.inf, high=np.inf, shape=(self.base_len,))
         stat = spaces.Box (low=-np.inf, high=np.inf, shape=(self.stat_len,))
-        self.observation_space = spaces.Dict (OrderedDict ([(OBS, obs), (TA, ta), (BASE, base), (STAT, stat)]))
-        self.data_space = spaces.Dict (OrderedDict ([(OBS, obs), (TA, ta), (BASE, base)]))
+        self.observation_space = spaces.Dict (OrderedDict ([(OBS, obs), (BASE, base), (STAT, stat)]))
+        self.data_space = spaces.Dict (OrderedDict ([(OBS, obs), (BASE, base)]))

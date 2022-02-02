@@ -20,7 +20,7 @@ if device == 'cuda':
 learning_rate = 0.001
 batch_size = 512
 num_classes = 10
-epochs = 3000
+epochs = 1000
 eval_interval = 10
 
 
@@ -99,6 +99,7 @@ def valall(model, dataset):
             multi_diff = np.sum(np.abs(pred-true), axis=0)
 
             multi_sum = multi_sum+multi_diff
+
         print('Eval diff: {:>.3}'.format(sum/dataset.__len__()), "  S:", np.round(multi_sum/dataset.__len__(), 3))
     model.train()
 
@@ -115,6 +116,7 @@ def val_loss(model, dataset):
             avg_loss += loss / len(test_loader)
         print('Loss Eval: {:>.4}'.format(avg_loss))
     model.train()
+    return avg_loss
 
 
 def val(model, dataset):
@@ -199,8 +201,9 @@ def train(data, testdata, validdatae):
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
             valall(model, validdatae)
-            val_loss(model, testdata)
-            val_loss(model, validdatae)
+            loss = val_loss(model, testdata)
+            loss += val_loss(model, validdatae)
+            print('AVG: {:>.4}'.format(loss/2))
             start_tim = now
 
 

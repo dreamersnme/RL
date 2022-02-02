@@ -30,7 +30,7 @@ class DLoader(Dataset):
         self.ta_seq = spec.ta_seq
 
         self.feature_len = spec.obs_len
-        self.ta_len = spec.ta_len
+
         self.base_len = spec.base_len
         self.price_len = spec.price_len
 
@@ -64,29 +64,25 @@ class DLoader(Dataset):
 
     def _get_normalizer(self):
         obsN = RunningMeanStd(shape=(self.feature_len,))
-        taN = RunningMeanStd(shape=(self.ta_len,))
         baseN = RunningMeanStd(shape=(self.base_len,))
         priceN = RunningMeanStd(shape=(self.price_len,))
         for day_no in range(self.day_cnt):
             day = self.data[day_no]
             obsN.update(day.obs)
-            taN.update(day.ta)
             baseN.update(day.base)
             priceN.update(self.price[day_no])
-
-        return {OBS: obsN, TA:taN, BASE:baseN, PRICE:priceN}
+        return {OBS: obsN,  BASE:baseN, PRICE:priceN}
 
     def up_gpu(self):
         days =dict()
         for day_no in range(self.day_cnt):
             day = self.data[day_no]
             obs = utils.obs_as_tensor(self.normalize(OBS, day.obs), DEVICE)
-            ta = utils.obs_as_tensor(self.normalize(TA, day.ta), DEVICE)
             base = utils.obs_as_tensor(self.normalize(BASE, day.base), DEVICE)
             price = utils.obs_as_tensor(self.normalize(PRICE, self.price[day_no]), DEVICE)
             direct = utils.obs_as_tensor(self.direction[day_no], DEVICE)
             day_data ={
-                OBS:obs, TA:ta, BASE:base, PRICE:price, DIRECT:direct}
+                OBS:obs, BASE:base, PRICE:price, DIRECT:direct}
             days[day_no]=day_data
         self.data = days
 
@@ -121,8 +117,7 @@ class DLoader(Dataset):
         s_idx = idx
         e_idx = idx+self.seq-1
         obs = day[OBS][s_idx: e_idx+1]
-        ta = day[TA][e_idx -self.ta_seq +1 :e_idx+1]
-        return ({OBS:obs, TA:ta, BASE:day[BASE]}, day[PRICE][e_idx], day[DIRECT][e_idx])
+        return ({OBS:obs, BASE:day[BASE]}, day[PRICE][e_idx], day[DIRECT][e_idx])
 
     #
 
