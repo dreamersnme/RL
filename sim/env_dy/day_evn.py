@@ -21,7 +21,6 @@ class Days(gym.Env):
         self.iteration = 0
         self.verbose = verbose
         self.obs_seq = spec.obs_seq
-        self.ta_seq = spec.ta_seq
         self.DATA = data
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float16)
         self.observation_space = spec.observation_space
@@ -55,7 +54,7 @@ class Days(gym.Env):
         TODAY = self.DATA[self.today]
         self.PRICE = (TODAY.price[:,0] / TIC) * TIC_VAL
         self.OBSERV = TODAY.obs
-        self.TA = TODAY.ta
+
         self.BASE = TODAY.base
 
 
@@ -74,10 +73,11 @@ class Days(gym.Env):
 
     def get_obs(self, unrealized_pnl, pos):
         obs = self.OBSERV[self.step_no - self.obs_seq + 1: self.step_no + 1]
-        ta = self.TA[self.step_no - self.ta_seq + 1: self.step_no + 1]
+
+
         stat = [unrealized_pnl, pos]
         base = self.BASE
-        stat_dict = OrderedDict ([(OBS, obs), (TA, ta), (BASE, base), (STAT, stat)])
+        stat_dict = OrderedDict ([(OBS, obs),(BASE, base), (STAT, stat)])
         return stat_dict
 
 
