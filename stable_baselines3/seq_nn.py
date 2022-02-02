@@ -46,7 +46,6 @@ class ResNet(nn.Module):
             nn.Conv2d (inch, outch, kernel_size=1, stride=1),
             nn.BatchNorm2d (outch))
 
-
         if inch==outch: self.shortcut = nn.Sequential()
         else: self.shortcut = nn.Sequential(
             nn.Conv2d (inch, outch, kernel_size=1, stride=1),
@@ -67,6 +66,7 @@ class Incept(nn.Module):
         inter_out = outch
         each = int(inter_out/layer)
         each_in = int(each/2)
+        each_in = each
         denseout = inter_out - each*(layer-1)
 
 
@@ -116,12 +116,7 @@ class Incept(nn.Module):
         conv2 = self.conv2(observations[:, :,1:])
         conv3 = self.conv3(observations)
         return th.concat([dense, conv2, conv3], dim=1)
-        # maxpool =self.maxpool(observations)
-        # avgpoll = self.avgpoll(observations)
-        # minpool = -self.minpool(-observations)
-        # cat  = th.concat([dense, conv2,conv3,maxpool, minpool], dim=1)
-        return cat
-        # return self.out(cat)
+
 
 
 
@@ -130,7 +125,8 @@ class CNN(nn.Module):
     def __init__(self, seq_len, init_ch):
         super (CNN, self).__init__ ()
         network = []
-        res_mulitple = [5,10,15,20,10]
+        # res_mulitple = [6, 12, 16, 10]
+        res_mulitple = [6, 12, 16, 12, 6, 3]
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
@@ -141,12 +137,44 @@ class CNN(nn.Module):
             network.append(resnet)
             res_inch = res_outch
 
+
         self.network = nn.Sequential(*network)
         self.feature_concat_dim = res_mulitple[-1]*init_ch
         self.seq = seq_len - req_reduce_sum
         summary(self, (1, seq_len, init_ch))
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.network(observations.transpose(-2, -1)).transpose(-2, -1)
+
+
+
+class SeqCNN(nn.Module):
+
+    def __init__(self, seq_len, init_ch, out_dim):
+        super (SeqCNN, self).__init__ ()
+        network = []
+        # res_mulitple = [6, 12, 16, 10]
+        res_mulitple = [6, 12, 16, 12, 6, 3]
+        res_inch = init_ch
+        req_reduce_sum = 0
+        for res in res_mulitple:
+            res_outch = int(init_ch* res)
+            resnet = Incept(res_inch, res_outch)
+            req_reduce_sum += resnet.reduce_seq
+            network.append(nn.Dropout(0.2))
+            network.append(resnet)
+            res_inch = res_outch
+
+        self.out = nn.Sequential(nn.Linear(res_inch, out_dim),
+                       nn.BatchNorm1d(out_dim),nn.Mish())
+
+        self.network = nn.Sequential(*network)
+        self.feature_concat_dim = res_mulitple[-1]*init_ch
+        self.seq = seq_len - req_reduce_sum
+        summary(self, (1, seq_len, init_ch))
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        xx = self.network(observations.transpose(-2, -1)).transpose(-2, -1)[:,-1]
+        return self.out(xx)
+
 
 
 class SeqLstm (nn.Module):

@@ -41,22 +41,32 @@ class RMSELoss(nn.Module):
 
 
 
+# class BaseMesh(nn.Module):
+#     def __init__(self, obs_space,out_dim: int = 64):
+#         super(BaseMesh,self).__init__()
+#         seq_len = obs_space.shape[0]
+#         seq_width = obs_space.shape[1]
+#         self.cnn = CNN(seq_len, seq_width)
+#         self.redu_seq = self.cnn.seq
+#         self.cat_width = self.cnn.feature_concat_dim
+#         self.rnn = SeqLstm(self.redu_seq,self.cat_width, layer_num=1, out_seq=1, out_dim=out_dim)
+#         self.features_dim = out_dim
+#
+#     def forward(self, obs: th.Tensor) -> th.Tensor:
+#         cc = self.cnn(obs)
+#         return self.rnn(cc)
+
+
 class BaseMesh(nn.Module):
     def __init__(self, obs_space,out_dim: int = 64):
         super(BaseMesh,self).__init__()
         seq_len = obs_space.shape[0]
         seq_width = obs_space.shape[1]
-        self.cnn = CNN(seq_len, seq_width)
-        self.rnn = SeqLstm(self.cnn.seq, self.cnn.feature_concat_dim, layer_num=1, out_seq=1, out_dim=out_dim)
+        self.cnn = SeqCNN(seq_len, seq_width, out_dim)
         self.features_dim = out_dim
 
-        # self.rnn22 = SeqLstm(seq_len, seq_width, layer_num=2, out_seq=1, out_dim=out_dim)
-
-
     def forward(self, obs: th.Tensor) -> th.Tensor:
-        cc = self.cnn(obs)
-        return self.rnn(cc)
-        # return self.rnn22(obs)
+        return self.cnn(obs)
 
 
 class CombinedModel(nn.Module):
