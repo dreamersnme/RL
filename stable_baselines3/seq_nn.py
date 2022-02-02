@@ -112,7 +112,6 @@ class SeqCNN (BaseFeaturesExtractor):
 
 
 
-RES =True
 
 class ResNet(nn.Module):
     def __init__(self, inch, outch, span=3):
@@ -151,37 +150,81 @@ class ResNet(nn.Module):
         shortcut = self.shortcut(observations)[:,:,self.reduce_seq:]
         return self.act(conv+maxpool+shortcut)
 
+class Incept(nn.Module):
+    def __init__(self, inch, outch):
+        super(Incept, self).__init__()
+        inter_out = outch
+        each = int(inter_out/4)
+        denseout = inter_out - each*3
+
+        self.dense = nn.Sequential(
+            nn.Conv2d(inch, denseout, kernel_size=1, stride=1),
+            nn.BatchNorm2d(denseout), nn.Mish ())
+
+        self.reduce_seq = 2
+        self.conv2 = nn.Sequential(
+            nn.Conv2d (inch, each, kernel_size=1, stride=1),
+            nn.BatchNorm2d (each),
+            nn.Mish (),
+            nn.Conv2d (each, each, kernel_size=(2, 1), stride=1),
+            nn.BatchNorm2d (each),
+            nn.Mish ()
+        )
+        self.reduce_seq = 2
+        self.conv3 = nn.Sequential(
+            nn.Conv2d (inch, each, kernel_size=1, stride=1),
+            nn.BatchNorm2d (each),
+            nn.Mish (),
+            nn.Conv2d (each, each, kernel_size=(3, 1), stride=1),
+            nn.BatchNorm2d (each),
+            nn.Mish ()
+        )
+
+        self.maxpool = nn.Sequential(
+            nn.MaxPool2d (kernel_size=(3, 1), stride=1),
+            nn.Conv2d (inch, each, kernel_size=1, stride=1),
+            nn.BatchNorm2d (each),
+            nn.Mish ())
+
+        # self.out = nn.Sequential( nn.Conv2d (inter_out, outch, kernel_size=1, stride=1),
+        #     nn.BatchNorm2d (outch),
+        #     nn.Mish ())
+
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        dense = self.dense(observations[:, :,self.reduce_seq:])
+        conv2 = self.conv2(observations[:, :,1:])
+        conv3 = self.conv3(observations)
+        maxpool =self.maxpool(observations)
+        cat  = th.concat([dense, conv2,conv3,maxpool], dim=1)
+        return cat
+        # return self.out(cat)
 
 
 
 class CNN(nn.Module):
 
-    def __init__(self, seq_len, seq_width,  init_ch=4, out_ch=16, span=2):
+    def __init__(self, seq_len, seq_width,  init_ch=2):
         super (CNN, self).__init__ ()
 
         network = [nn.Unflatten(-2, (1, seq_len)),
-            nn.Conv2d (1, init_ch, kernel_size=(span, 1), stride=1),
+            nn.Conv2d (1, init_ch, kernel_size=1, stride=1),
             nn.BatchNorm2d (init_ch),
-            nn.Mish(), nn.Dropout(0.2)]
-        res_mulitple = [1,2,4,5,6]
+            nn.Mish()]
+        res_mulitple = [4,6,8,10,10]
 
         res_inch = init_ch
-        req_reduce_sum = span -1
+        req_reduce_sum = 0
         for res in res_mulitple:
             res_outch = init_ch* res
-            resnet = ResNet(res_inch, res_outch, span)
+            resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
-            network.append(resnet)
             network.append(nn.Dropout(0.2))
+            network.append(resnet)
             res_inch = res_outch
 
-
-        out_layer = [nn.Conv2d(res_outch, out_ch, kernel_size=1, stride=1),
-                     nn.BatchNorm2d(out_ch),
-                     nn.Mish()]
-        network.extend(out_layer)
         self.network = nn.Sequential(*network)
-        self.feature_concat_dim = out_ch * seq_width
+        self.feature_concat_dim = res_mulitple[-1]*init_ch  * seq_width
         self.seq = seq_len - req_reduce_sum
 
 

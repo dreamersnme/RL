@@ -110,7 +110,7 @@ class BaseMesh(nn.Module):
 class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
         super (CombinedModel, self).__init__ ()
-        self.obs = BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE], out_dim=128)
+        self.obs = BaseMesh (observation_space.spaces[OBS], observation_space.spaces[BASE])
 
         seq = observation_space.spaces[OBS].shape[0]
         width = observation_space.spaces[OBS].shape[1]

@@ -25,7 +25,7 @@ MODEL_DIR = os.path.join(ROOT, "MODELS")
 PRETRAINED = os.path.join(MODEL_DIR, "best_model.pt")
 
 class DataSpec:
-    obs_seq = 10
+    obs_seq = 16
     ta_seq = 5
     stat_len = 2
     def __init__(self, ref):
