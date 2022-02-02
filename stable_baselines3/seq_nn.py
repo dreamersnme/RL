@@ -153,7 +153,7 @@ class SeqCNN(nn.Module):
             res_outch = int(init_ch* res)
             resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
-            network.append(nn.Dropout(0.2))
+            network.append(nn.Dropout(0.3))
             network.append(resnet)
             res_inch = res_outch
 

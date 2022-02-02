@@ -159,7 +159,7 @@ class CECK():
 
         try:
             model = OutterModel(spec).to(device)
-            # model.load_state_dict(th.load(self.file_name))
+            model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
