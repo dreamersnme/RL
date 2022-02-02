@@ -17,10 +17,10 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.001
+learning_rate = 0.0005
 batch_size = 512
 num_classes = 10
-epochs = 1000
+epochs = 5000
 eval_interval = 10
 
 
@@ -209,7 +209,7 @@ def train(data, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    t_data, valid, test, tri = extractor.load_trainset(10)
+    t_data, valid, test, tri = extractor.load_trainset(15)
     REF = DataSpec (t_data[0])
 
     data = DLoader(t_data, REF)

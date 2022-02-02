@@ -19,7 +19,6 @@ def ta_idx(df):
          l = df['low'].values
          v = df['volume'].astype(float).values
 
-         xx = tb.MA(c, timeperiod=5)
 
          # define the technical analysis matrix
 
@@ -30,13 +29,13 @@ def ta_idx(df):
          ta['vMA5'] = tb.MA(v, timeperiod=5) / np.nanmean(tb.MA(v, timeperiod=5))
          ta['vMA10'] = tb.MA(v, timeperiod=10) / np.nanmean(tb.MA(v, timeperiod=10))
 
-         ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
-         ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
-         ta['ADX'] = tb.ADX(h, l, c, timeperiod=14) / np.nanmean(tb.ADX(h, l, c, timeperiod=14))
-         ta['ADXR'] = tb.ADXR(h, l, c, timeperiod=14) / np.nanmean(tb.ADXR(h, l, c, timeperiod=14))
-         ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
-                      np.nanmean(tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0])
-         ta['RSI'] = tb.RSI(c, timeperiod=14) / np.nanmean(tb.RSI(c, timeperiod=14))
+         # ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
+         # ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
+         ta['ADX'] = tb.ADX(h, l, c, timeperiod=6) / np.nanmean(tb.ADX(h, l, c, timeperiod=6))
+         ta['ADXR'] = tb.ADXR(h, l, c, timeperiod=6) / np.nanmean(tb.ADXR(h, l, c, timeperiod=6))
+         # ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
+         #              np.nanmean(tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0])
+         ta['RSI'] = tb.RSI(c, timeperiod=5) / np.nanmean(tb.RSI(c, timeperiod=5))
          ta['BBANDS_U'] = tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[0] / \
                           np.nanmean(tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[0])
          ta['BBANDS_M'] = tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[1] / \
@@ -44,13 +43,38 @@ def ta_idx(df):
          ta['BBANDS_L'] = tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[2] / \
                           np.nanmean(tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[2])
          ta['AD'] = tb.AD(h, l, c, v) / np.nanmean(tb.AD(h, l, c, v))
-         ta['ATR'] = tb.ATR(h, l, c, timeperiod=14) / np.nanmean(tb.ATR(h, l, c, timeperiod=14))
+         ta['ATR'] = tb.ATR(h, l, c, timeperiod=7) / np.nanmean(tb.ATR(h, l, c, timeperiod=7))
          ta['HT_DC'] = tb.HT_DCPERIOD(c) / np.nanmean(tb.HT_DCPERIOD(c))
          ta["High/orice"] = h / o
          ta["Low/Open"] = l / o
          ta["Close/Open"] = c / o
          ta["HL"] = h-l
          return ta
+
+def lag_minmax(close):
+
+    lags = [5, 10,20]
+    columns = []
+    for lag in lags:
+        columns.extend( [f'minval{lag}', f'minidx{lag}', f'maxval{lag}', f'maxidx{lag}'])
+
+    df = pd.DataFrame(columns=columns , dtype=float)
+
+    for idx in close.index:
+
+        result =[]
+        for lag in lags:
+            target = close.loc[max(0,idx-lag+1):idx][::-1]
+            min_idx =  target.idxmin() - idx
+            min_val= target.min()
+            max_idx = target.idxmax() - idx
+            max_val = target.max()
+            result.extend([min_val, min_idx, max_val, max_idx])
+        df.loc[idx] = result
+
+    return df
+
+
 
 
 
@@ -99,10 +123,13 @@ def get_base():
 
     return df, base
 
+
+
 def get_data():
     df, base = get_base()
     anal = ta_idx(df)
-    df = pd.concat([df.reset_index(drop=True), anal.reset_index(drop=True)], axis=1)
+    minmax= lag_minmax(df['close'])
+    df = pd.concat([df.reset_index(drop=True), minmax.reset_index(drop=True), anal.reset_index(drop=True)], axis=1)
     df = df[(df.h >= tm[0]) & (df.h <= tm[1])]
     del df['tm_key']
     del df['h']
@@ -119,7 +146,7 @@ def adj(df, base):
     df= pd.merge(left=df, right=base2, how="left", on='st_dt')
     df['volume'] = df.volume / df.volume_mean
 
-    prices = ['open', 'high', 'low', 'close', 'transaction']
+    prices = ['open', 'high', 'low', 'close', 'transaction', 'maxval5', 'maxval10', 'maxval20', 'minval5', 'minval10', 'minval20']
     for name in prices:
         df[name] = df[name] - df.base_price
 
@@ -142,7 +169,7 @@ def save():
     print("-------------DATA---------------")
     print(df.head(3))
     print("-------------ADJ---------------")
-    print(adj_df.head(3))
+    print(adj_df.head(30))
 
 Day = namedtuple('day', ['dt', OBS, BASE, PRICE])
 
@@ -176,13 +203,13 @@ def _load(target, trim ):
     return all_days
 
 def load_ml():
-    return  _load(['re1', 're2', 're3']
+    return  _load(['re1', 're2' ]
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
 
 
 def load_trainset(size=100):
-    buff = 3
-    test_size = 3
+    buff = 4
+    test_size = 4
     all_idx = size + test_size + buff
 
     all_data = load_ml()[-all_idx: -buff]

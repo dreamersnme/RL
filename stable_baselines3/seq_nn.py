@@ -62,11 +62,11 @@ class ResNet(nn.Module):
 class Incept(nn.Module):
     def __init__(self, inch, outch):
         super(Incept, self).__init__()
-        layer = 3
+        layer = 4
         inter_out = outch
         each = int(inter_out/layer)
         each_in = int(each/2)
-        each_in = each
+        # each_in = each
         denseout = inter_out - each*(layer-1)
 
 
@@ -92,30 +92,23 @@ class Incept(nn.Module):
             nn.Mish ()
         )
 
-        # self.maxpool = nn.Sequential(
-        #     nn.MaxPool1d (kernel_size=3, stride=1),
-        #     nn.Conv1d (inch, each, kernel_size=1, stride=1),
-        #     nn.BatchNorm1d (each),
-        #     nn.Mish ())
-        #
-        #
-        # self.minpool = nn.Sequential(
-        #     nn.MaxPool1d (kernel_size=3, stride=1),
-        #     nn.Conv1d (inch, each, kernel_size=1, stride=1),
-        #     nn.BatchNorm1d (each),
-        #     nn.Mish ())
-
-        # self.out = nn.Sequential( nn.Conv2d (inter_out, outch, kernel_size=1, stride=1),
-        #     nn.BatchNorm2d (outch),
-        #     nn.Mish ())
-
+        self.conv5 = nn.Sequential(
+            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
+            nn.BatchNorm1d(each_in),
+            nn.Mish(),
+            nn.Conv1d(each_in, each, kernel_size=5, stride=1),
+            nn.BatchNorm1d(each),
+            nn.Mish()
+        )
+        self.reduce_seq = 4
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
 
         dense = self.dense(observations[:, :,self.reduce_seq:])
-        conv2 = self.conv2(observations[:, :,1:])
-        conv3 = self.conv3(observations)
-        return th.concat([dense, conv2, conv3], dim=1)
+        conv2 = self.conv2(observations[:, :,self.reduce_seq-1:])
+        conv3 = self.conv3(observations[:, :,self.reduce_seq-2:])
+        conv5 = self.conv5(observations)
+        return th.concat([dense, conv2, conv3, conv5], dim=1)
 
 
 
@@ -126,7 +119,7 @@ class CNN(nn.Module):
         super (CNN, self).__init__ ()
         network = []
         # res_mulitple = [6, 12, 16, 10]
-        res_mulitple = [6, 12, 16, 12, 6, 3]
+        res_mulitple = [6, 12, 16, 12, 6]
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
@@ -153,7 +146,7 @@ class SeqCNN(nn.Module):
         super (SeqCNN, self).__init__ ()
         network = []
         # res_mulitple = [6, 12, 16, 10]
-        res_mulitple = [6, 12, 16, 12, 6, 3]
+        res_mulitple = [8, 16, 16, 8, 4]
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
@@ -164,7 +157,7 @@ class SeqCNN(nn.Module):
             network.append(resnet)
             res_inch = res_outch
 
-        self.out = nn.Sequential(nn.Linear(res_inch, out_dim),
+        self.out = nn.Sequential(nn.Dropout(0.4),nn.Linear(res_inch, out_dim),
                        nn.BatchNorm1d(out_dim),nn.Mish())
 
         self.network = nn.Sequential(*network)
