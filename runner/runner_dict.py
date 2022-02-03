@@ -15,14 +15,14 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data, valid, _, _ = extractor.load_trainset(10)
+data, valid, _, _ = extractor.load_trainset(15)
 
 ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
-    unit_episode = len(data)
+    unit_episode = len(data) * 300
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.4
@@ -65,7 +65,7 @@ class IterRun:
 
     def set_same(self):
         model = self.unit_model()
-        self.buffer = model.replay_buffer
+        self.buffer = model.rollout_buffer
         model.save(self.save)
         print("-----  CREATE", self.name, " SEED ", self.seed)
 
@@ -109,13 +109,13 @@ class IterRun:
             if reward > min_reward: break
         if suit_model is None:
             suit_model = bad_model
-            self.buffer = suit_model.replay_buffer
+            self.buffer = suit_model.rollout_buffer
             print(" - - - - - BOOST Selection Failed: ", self.name, "Bad Model Count", max_cont)
 
         else:
             print (" - - - - - BOOST Selected: ", self.name, minimum, "Seed:", model.seed)
             self.seed = model.seed
-            self.buffer = suit_model.replay_buffer
+            self.buffer = suit_model.rollout_buffer
 
         suit_model.save(self.save)
 
@@ -124,15 +124,10 @@ class IterRun:
 
     def _create(self, env=None, learning_starts = 100):
         policy_kwargs = dict(net_arch=self.arch)
-        noise = NormalActionNoise(
-            mean=np.zeros(1), sigma=self.noise_std * np.ones(1)
-        )
         if env is None:env = self.env
         seed = self.seed or np.random.randint(1e8)
-        model = self.model_cls("MultiInputPolicy", env, verbose=1, action_noise=noise, seed =seed,
-                               gradient_steps= 1, gamma=1.0,
-                               batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=1000_000,
-                               learning_starts=learning_starts)
+        model = self.model_cls("MultiInputPolicy", env, verbose=1, seed =seed,
+                                policy_kwargs=policy_kwargs)
 
 
         if self.TRANSFER:
@@ -143,23 +138,20 @@ class IterRun:
 
         return model
 
-    def extractors(self, model): return [aa.features_extractor.combined for aa in model.actors]
+    def extractors(self, model): return [model.policy.features_extractor.combined]
 
     def load_model(self, noise):
         model = self.model_cls.load(self.save, env=self.env)
-        if self.buffer: model.replay_buffer = self.buffer
+        if self.buffer: model.rollout_buffer = self.buffer
         model.set_random_seed (self.seed)
         for grad_on_epi in self.grad_steps:
-            if grad_on_epi[0] < model.replay_buffer.size():
+            if grad_on_epi[0] < model.rollout_buffer.size():
                 model.gradient_steps = grad_on_epi[1]
             else: break
 
 
         print("LOADED", self.save, self.iter, model.seed)
-        print(self.name, "BUFFER REUSE:", model.replay_buffer.size())
-        if noise is not None:
-            model.action_noise.sigma=noise * np.ones(1)
-            print(self.name,"Noise Reset:", noise)
+        print(self.name, "BUFFER REUSE:", model.rollout_buffer.size())
 
         if self.TRANSFER and self.iter <= self.adapt_delay:
             print(self.name," FIX EXTRACTOR :", self.iter ,"<", self.adapt_delay)
@@ -177,11 +169,11 @@ class IterRun:
         self.seed = np.random.randint (1e8)
         traing_epi = traing_epi or self.train_epi
         model = self.load_model(noise)
-        print(self.name, [list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
+        # print(self.name, [list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
-        model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)
-        self.buffer = model.replay_buffer
+        model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB)
+        self.buffer = model.rollout_buffer
 
         print("===========   EVAL   =======   ", self.name, self.iter, ",FPS: ", CB.fps)
         train = {

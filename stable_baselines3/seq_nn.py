@@ -134,14 +134,13 @@ class CNN(nn.Module):
         self.network = nn.Sequential(*network)
         self.feature_concat_dim = res_mulitple[-1]*init_ch
         self.seq = seq_len - req_reduce_sum
-        summary(self, (1, seq_len, init_ch))
+
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.network(observations.transpose(-2, -1)).transpose(-2, -1)
 
 
 
 class SeqCNN(nn.Module):
-
     def __init__(self, seq_len, init_ch, out_dim):
         super (SeqCNN, self).__init__ ()
         network = []
@@ -163,7 +162,7 @@ class SeqCNN(nn.Module):
         self.network = nn.Sequential(*network)
         self.feature_concat_dim = res_mulitple[-1]*init_ch
         self.seq = seq_len - req_reduce_sum
-        summary(self, (1, seq_len, init_ch))
+
     def forward(self, observations: th.Tensor) -> th.Tensor:
         xx = self.network(observations.transpose(-2, -1)).transpose(-2, -1)[:,-1]
         return self.out(xx)
