@@ -17,9 +17,8 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.0005
-batch_size = 128
-num_classes = 10
+learning_rate = 0.00001
+batch_size = 500
 epochs = 5000
 eval_interval = 10
 
@@ -197,11 +196,9 @@ def train(traindata, testdata, validdatae):
         total_time += time.time()-start
         ckp.save_best(model, avg_loss)
         if (epoch +1)%eval_interval ==0:
-
-
             now = time.time()
 
-            print('==== [Epoch: {:>4}] loss = {:>.9}'.format(epoch + 1, avg_loss), total_time, int((eval_interval*traindata.__len__())/total_time))
+            print('==== [Epoch: {:>4}] loss = {:>.4}'.format(epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
             total_time =0
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
@@ -214,7 +211,7 @@ def train(traindata, testdata, validdatae):
 
 
 if __name__ == '__main__':
-    t_data, valid, test, tri = extractor.load_trainset(15)
+    t_data, valid, test, tri = extractor.load_trainset(TRAIN_TARGET)
     REF = DataSpec (t_data[0])
 
     data = DLoader(t_data, REF)

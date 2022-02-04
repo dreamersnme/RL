@@ -4,6 +4,8 @@ from collections import OrderedDict
 import numpy as np
 from gym import spaces
 
+
+TRAIN_TARGET = 5
 TIC = 0.01
 TIC_VAL = 1  #10달러 만원
 COMMITION = 0.25
@@ -26,7 +28,7 @@ PRETRAINED = os.path.join(MODEL_DIR, "best_model.pt")
 class DataSpec:
     obs_seq = 21
     ta_seq = 5
-    stat_len = 2
+    stat_len = 1
     def __init__(self, ref):
         self.obs_len = ref.obs.shape[1]
         self.base_len = ref.base.shape[0]

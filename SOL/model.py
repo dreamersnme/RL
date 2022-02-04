@@ -64,7 +64,6 @@ class BaseMesh(nn.Module):
         seq_width = obs_space.shape[1]
         self.cnn = SeqCNN(seq_len, seq_width, out_dim)
         self.features_dim = out_dim
-
         # summary (self, (1, seq_len, seq_width))
     def forward(self, obs: th.Tensor) -> th.Tensor:
         return self.cnn(obs)
@@ -103,7 +102,7 @@ class OutterModel(nn.Module):
         self.direction =  nn.Sequential(
             nn.Linear(dim2, spec.price_len),
             nn.Tanh())
-        self.module.requires_grad_ (False)
+        # self.module.requires_grad_ (False)
 
 
 

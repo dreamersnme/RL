@@ -177,6 +177,7 @@ class TD3Policy(BasePolicy):
 
         if self.share_features_extractor:
             self.critic = self.make_critic(features_extractor=self.actor.features_extractor)
+            print("ssssssssssssssssssssss")
             # Critic target should not share the features extactor with critic
             # but it can share it with the actor target as actor and critic are sharing
             # the same features_extractor too

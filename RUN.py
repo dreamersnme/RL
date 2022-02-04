@@ -25,7 +25,7 @@ def compair_run(iter, model=None):
 
     if model in names: iter_run = IterRun(names[model])
     elif model in namesX: iter_run = IterRun(namesX[model], PRETRAINED)
-    else : iter_run =IterRun(SAC,PRETRAINED)#, IterRun(DDPG), IterRun(SAC)]
+    else : iter_run =IterRun(DDPG,PRETRAINED)#, IterRun(DDPG), IterRun(SAC)]
 
     print("======================================")
     print ("======================================")

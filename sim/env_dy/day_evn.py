@@ -46,7 +46,6 @@ class Days(gym.Env):
         self.done = True
 
     def reset(self):
-
         if not self.done: raise Exception("Reset without reach end")
         if self.today >= self.day_count:
             self.reset_env()
@@ -62,11 +61,11 @@ class Days(gym.Env):
         self.step_no = self.obs_seq - 1 # 0부터 시작
 
         unrealized_pnl = 0.0
+        self.pre_state = None
         self.state = self.get_obs(unrealized_pnl, 0)
-
-
         self.done = False
         self.buy_price = 0
+
         self.today += 1
         self.iteration += 1
         return self.state
@@ -75,7 +74,8 @@ class Days(gym.Env):
         obs = self.OBSERV[self.step_no - self.obs_seq + 1: self.step_no + 1]
 
 
-        stat = [unrealized_pnl, pos]
+        self.pre_state = (pos,unrealized_pnl)
+        stat = [pos]
         base = self.BASE
         stat_dict = OrderedDict ([(OBS, obs),(BASE, base), (STAT, stat)])
         return stat_dict
@@ -135,8 +135,7 @@ class Days(gym.Env):
     def step_normal(self, action):
         pre_price = self.buy_price
         balance = self.acc_balance[-1]
-        pre_unrealized_pnl = self.state[STAT][0]
-        pre_stat = self.state[STAT][-1]
+        (pre_stat, pre_unrealized_pnl) = self.pre_state
 
         total_asset_starting = balance + pre_unrealized_pnl
 
@@ -145,12 +144,9 @@ class Days(gym.Env):
         self.acc_balance = np.append(self.acc_balance, new_bal)
         self.position_log = np.append(self.position_log, new_stat)
 
-
-
         # NEXT DAY
         unrealized_pnl = self._unrealized_profit(new_stat, self.buy_price)
         stat = [unrealized_pnl, new_stat]
-
 
         self.state = self.get_obs(unrealized_pnl, new_stat)
         # test_price = self.getprice(self.step_no - 1)

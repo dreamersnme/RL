@@ -4,7 +4,7 @@ import time
 
 from torch.utils.tensorboard import SummaryWriter
 import torch as th
-from CONFIG import DataSpec, MODEL_DIR
+from CONFIG import DataSpec, MODEL_DIR, TRAIN_TARGET
 from SOL import extractor
 
 from runner.callbacks import LearnEndCallback
@@ -15,17 +15,19 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data, valid, _, _ = extractor.load_trainset(15)
+traindata, valid, _, _ = extractor.load_trainset(TRAIN_TARGET)
+valid = traindata
+
 
 ENV = Days
-SPEC = DataSpec (data[0])
+SPEC = DataSpec (traindata[0])
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
-    unit_episode = len(data)
+    unit_episode = len(traindata)
     roleout_epi = unit_episode * 1
     noise_std = 0.4
-    adapt_delay = 25
+    adapt_delay = 5
     batch_size = 128
     buffer_size = 1_000_000
 
@@ -56,7 +58,7 @@ class IterRun:
         return pre_trained.module
 
     def make_env(self):
-        env = DummyVecEnv([lambda: ENV(data, SPEC, verbose=False)])
+        env = DummyVecEnv([lambda: ENV(traindata, SPEC, verbose=False)])
         return VecNormalize(env, norm_obs_keys=["obs", "stat"])
 
     def init_env(self):
@@ -92,7 +94,7 @@ class IterRun:
 
         for iter in range(self.BOOST_SEARCH):
             model = self.unit_model()
-            if iter == 0: print (model.policy)
+            # if iter == 0: print (model.policy)
             eval = self.evaluation(model, test_env)
             reward = eval["1_Reward"]
             count = eval['4_Trade']
@@ -222,7 +224,7 @@ class IterRun:
             "2_Profit": info['profit'],
             "3_Risk": info['risk'],
             "4_Trade": info['cnt'],
-            "5_Perform": max(0, min(10, info['profit']/info['cnt'])),
+            "5_Perform": max(0, min(20, info['profit']/info['cnt'])),
         }
 
         return rslt
