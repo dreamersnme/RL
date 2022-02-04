@@ -32,7 +32,7 @@ class LearnEndCallback(BaseCallback):
         log = self.logger.name_to_value.copy()
         self.last_aloss = log["train/actor_loss"]
         self.last_closs = log["train/critic_loss"]
-        number_delta = self.model._n_updates - self.start_num
+        number_delta = (self.model._n_updates - self.start_num) * self.model.batch_size
         self.fps = int( number_delta/ (time.time()-self.start_tm))
 
 
