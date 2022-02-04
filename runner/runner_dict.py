@@ -15,18 +15,18 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data, valid, _, _ = extractor.load_trainset(15)
-
+data, valid, _, _ = extractor.load_trainset(5)
+valid = data
 ENV = Days
 SPEC = DataSpec (data[0])
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
-    unit_episode = len(data) * 300
+    unit_episode = len(data) * 550
     train_epi = unit_episode * 1
     grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
     noise_std = 0.4
-    adapt_delay = 25
+    adapt_delay = 5
 
     def __init__(self, MODEL, TRANSFER = None, arc=[256, 128], retrain=False, batch_size=64, seed=None):
         self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
@@ -73,7 +73,7 @@ class IterRun:
         env = self.make_env()
         model = self._create(env=env, learning_starts=self.unit_episode)
         self.train_start = time.time()
-        learn_steps = self.unit_episode * 2
+        learn_steps = self.unit_episode
 
         model.learn(total_timesteps=learn_steps, log_interval=self.unit_episode)
         model.learning_starts = 0
