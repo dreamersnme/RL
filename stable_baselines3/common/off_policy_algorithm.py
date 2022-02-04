@@ -339,7 +339,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
     ) -> "OffPolicyAlgorithm":
 
 
-        role_time = 0
         total_timesteps, callback = self._setup_learn(
             total_timesteps,
             eval_env,
@@ -350,10 +349,12 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             reset_num_timesteps,
             tb_log_name,
         )
-        callback.on_training_start(locals(), globals())
 
+
+        start = time.time ()
+        self.predict_tm = 0
         while self._episode_num < total_timesteps:
-            start = time.time()
+
             rollout = self.collect_rollouts(
                 self.env,
                 train_freq=self.train_freq,
@@ -363,22 +364,22 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 replay_buffer=self.replay_buffer,
                 log_interval=log_interval,
             )
-            role_time += time.time()-start
+        print ("ROLE TIME ", int(time.time()-start))
+        print ("PRED TIME ", int (self.predict_tm))
 
+        callback.on_training_start (locals (), globals ())
+        start = time.time ()
+        if self._episode_num >= self.learning_starts:
+            # If no `gradient_steps` is specified,
+            # do as many gradients steps as steps performed during the rollout
+            gradient_steps = self.gradient_steps if self.gradient_steps >= 0 else rollout.episode_timesteps
+            # Special case when the user passes `gradient_steps=0`
+            if gradient_steps > 0:
+                self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
+        print ("TRAIN TIME ", int (time.time () - start))
+        callback.on_training_end ()
+        self._dump_logs ()
 
-            if rollout.continue_training is False:
-                break
-
-            if self._episode_num >= self.learning_starts:
-                # If no `gradient_steps` is specified,
-                # do as many gradients steps as steps performed during the rollout
-                gradient_steps = self.gradient_steps if self.gradient_steps >= 0 else rollout.episode_timesteps
-                # Special case when the user passes `gradient_steps=0`
-                if gradient_steps > 0:
-                    self.train(batch_size=self.batch_size, gradient_steps=gradient_steps)
-
-        callback.on_training_end()
-        print("ROLE TIME ", role_time)
 
 
         return self
@@ -594,9 +595,9 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                 self.actor.reset_noise(env.num_envs)
 
             # Select action randomly or according to policy
-
+            pred_tm = time.time()
             actions, buffer_actions = self._sample_action(learning_starts, action_noise, env.num_envs)
-
+            self.predict_tm += (time.time()-pred_tm)
 
             # Rescale and perform action
             new_obs, rewards, dones, infos = env.step(actions)
@@ -608,8 +609,6 @@ class OffPolicyAlgorithm(BaseAlgorithm):
             # Give access to local variables
             callback.update_locals(locals())
             # Only stop training if return value is False, not when it is None.
-            if callback.on_step() is False:
-                return RolloutReturn(num_collected_steps * env.num_envs, num_collected_episodes, continue_training=False)
 
             # Retrieve reward and episode length if using Monitor wrapper
             self._update_info_buffer(infos, dones)
@@ -636,9 +635,7 @@ class OffPolicyAlgorithm(BaseAlgorithm):
                         kwargs = dict(indices=[idx]) if env.num_envs > 1 else {}
                         action_noise.reset(**kwargs)
 
-                    # Log training infos
-                    if log_interval is not None and self._episode_num % log_interval == 0:
-                        self._dump_logs()
+
 
         callback.on_rollout_end()
 
