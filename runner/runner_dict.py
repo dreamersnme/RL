@@ -15,7 +15,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocV
 import numpy as np
 
 
-data, valid, _, _ = extractor.load_trainset(10)
+data, valid, _, _ = extractor.load_trainset(15)
 
 ENV = Days
 SPEC = DataSpec (data[0])
@@ -23,12 +23,13 @@ class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
     unit_episode = len(data)
-    train_epi = unit_episode * 1
-    grad_steps =[(1e5, 2), (5e5, 3), (8e5, 4)]
+    roleout_epi = unit_episode * 1
     noise_std = 0.4
     adapt_delay = 25
+    batch_size = 128
+    buffer_size = 1_000_000
 
-    def __init__(self, MODEL, TRANSFER = None, arc=[256, 128], retrain=False, batch_size=64, seed=None):
+    def __init__(self, MODEL, TRANSFER = None, arc=[256, 128], retrain=False,  seed=None):
         self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
 
         self.seed = seed
@@ -42,7 +43,7 @@ class IterRun:
         self.arch = arc
         self.iter = 1
         self.time_recoder = TimeRecode(self.writer)
-        self.batch_size = batch_size
+        self.init_grad_epoch = int((self.unit_episode * 600) / self.batch_size) * 10
         if retrain: pass
         elif self.seed is None: self.init_boost (self.MIN_TRADE)
         else :self.set_same()
@@ -71,12 +72,12 @@ class IterRun:
 
     def unit_model(self):
         env = self.make_env()
-        model = self._create(env=env, learning_starts=self.unit_episode)
+        model = self._create(env=env)
         self.train_start = time.time()
-        learn_steps = self.unit_episode * 2
 
-        model.learn(total_timesteps=learn_steps, log_interval=self.unit_episode)
-        model.learning_starts = 0
+        CB = LearnEndCallback ()
+        model.learn(total_timesteps=self.roleout_epi, callback=CB, log_interval=self.unit_episode)
+        print ("===BOOST FPS: ", CB.fps)
         return model
 
     def init_boost(self, MIN_TRADE, min_reward=-1000):
@@ -122,7 +123,7 @@ class IterRun:
         del suit_model
 
 
-    def _create(self, env=None, learning_starts = 100):
+    def _create(self, env=None, learning_starts = 1):
         policy_kwargs = dict(net_arch=self.arch)
         noise = NormalActionNoise(
             mean=np.zeros(1), sigma=self.noise_std * np.ones(1)
@@ -130,8 +131,8 @@ class IterRun:
         if env is None:env = self.env
         seed = self.seed or np.random.randint(1e8)
         model = self.model_cls("MultiInputPolicy", env, verbose=1, action_noise=noise, seed =seed,
-                               gradient_steps= 1, gamma=1.0,
-                               batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=1000_000,
+                               gradient_steps= self.init_grad_epoch, gamma=1.0,
+                               batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=self.buffer_size,
                                learning_starts=learning_starts)
 
 
@@ -149,11 +150,9 @@ class IterRun:
         model = self.model_cls.load(self.save, env=self.env)
         if self.buffer: model.replay_buffer = self.buffer
         model.set_random_seed (self.seed)
-        for grad_on_epi in self.grad_steps:
-            if grad_on_epi[0] < model.replay_buffer.size():
-                model.gradient_steps = grad_on_epi[1]
-            else: break
 
+        model.gradient_steps = self.init_grad_epoch \
+                               *  ( 1 + int((model.replay_buffer.size()/self.buffer_size)*10))
 
         print("LOADED", self.save, self.iter, model.seed)
         print(self.name, "BUFFER REUSE:", model.replay_buffer.size())
@@ -171,16 +170,15 @@ class IterRun:
         for ex in self.extractors(model):
             ex.requires_grad_(False)
 
-    def train_eval(self, traing_epi = None, noise=None):
+    def train_eval(self,  noise=None):
         self.init_env()
         self.time_recoder.start()
         self.seed = np.random.randint (1e8)
-        traing_epi = traing_epi or self.train_epi
         model = self.load_model(noise)
         print(self.name, [list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
-        model.learn(total_timesteps=traing_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)
+        model.learn(total_timesteps=self.roleout_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)
         self.buffer = model.replay_buffer
 
         print("===========   EVAL   =======   ", self.name, self.iter, ",FPS: ", CB.fps)
