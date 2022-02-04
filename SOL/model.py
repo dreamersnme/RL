@@ -65,6 +65,7 @@ class BaseMesh(nn.Module):
         self.cnn = SeqCNN(seq_len, seq_width, out_dim)
         self.features_dim = out_dim
 
+        # summary (self, (1, seq_len, seq_width))
     def forward(self, obs: th.Tensor) -> th.Tensor:
         return self.cnn(obs)
 
@@ -73,7 +74,6 @@ class CombinedModel(nn.Module):
     def __init__(self, observation_space: gym.spaces.Dict):
         super (CombinedModel, self).__init__ ()
         self.obs = BaseMesh (observation_space.spaces[OBS])
-
         self.features_dim = self.obs.features_dim
         # self.features_dim = self.obs.features_dim + self.base.features_dim
     def forward(self, observations: TensorDict) -> th.Tensor:
@@ -103,6 +103,11 @@ class OutterModel(nn.Module):
         self.direction =  nn.Sequential(
             nn.Linear(dim2, spec.price_len),
             nn.Tanh())
+        self.module.requires_grad_ (False)
+
+
+
+
 
     def forward(self, observations: TensorDict) -> th.Tensor:
         feature = self.module(observations)
