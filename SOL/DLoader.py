@@ -36,6 +36,7 @@ class DLoader(Dataset):
 
         self.daily_size = [day.obs.shape[0] - self.seq+1 for day in self.data]
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
+        print(self.daily_idx)
         self.normalizer = normalizer
         if normalizer is None: self.normalizer = self._get_normalizer()
         self.up_gpu()
