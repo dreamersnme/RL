@@ -18,7 +18,7 @@ if device == 'cuda':
 
 
 learning_rate = 0.0005
-batch_size = 512
+batch_size = 128
 num_classes = 10
 epochs = 5000
 eval_interval = 10
@@ -95,7 +95,6 @@ def valall(model, dataset):
             true = dataset.denorm_target(target.cpu().numpy())
             diff = np.sum(np.abs(pred[:,0]-true[:,0]))
             sum +=np.sum(diff)
-
             multi_diff = np.sum(np.abs(pred-true), axis=0)
 
             multi_sum = multi_sum+multi_diff
@@ -166,10 +165,10 @@ class CECK():
             return OutterModel(spec).to(device)
 
 
-def train(data, testdata, validdatae):
+def train(traindata, testdata, validdatae):
     ckp = CECK()
-    train_loader = DataLoader(data, batch_size=batch_size, shuffle= True)
-    model = ckp.load(data.spec)
+    train_loader = DataLoader(traindata, batch_size=batch_size, shuffle= True)
+    model = ckp.load(traindata.spec)
 
     model.train()
 
@@ -179,8 +178,12 @@ def train(data, testdata, validdatae):
 
     start_tim = time.time()
 
+    total_time = 0
+    print("DATA SIZE", traindata.__len__() )
     for epoch in range(epochs):  # epochs수만큼 반복
         avg_loss = 0
+
+        start = time.time()
         for data, target, direction in train_loader:
 
             target = th.cat([target, direction], dim=1)
@@ -191,13 +194,15 @@ def train(data, testdata, validdatae):
             loss.backward()
             optimizer.step()
             avg_loss += loss / len(train_loader)  # loss 값을 변수에 누적하고 train_loader의 개수로 나눔 = 평균
-
+        total_time += time.time()-start
         ckp.save_best(model, avg_loss)
-
         if (epoch +1)%eval_interval ==0:
+
+
             now = time.time()
 
-            print('==== [Epoch: {:>4}] loss = {:>.9}'.format(epoch + 1, avg_loss), int(now-start_tim))
+            print('==== [Epoch: {:>4}] loss = {:>.9}'.format(epoch + 1, avg_loss), total_time, int((eval_interval*traindata.__len__())/total_time))
+            total_time =0
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
             valall(model, validdatae)
