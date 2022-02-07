@@ -2,9 +2,10 @@ from collections import namedtuple
 
 import pandas as pd
 import sqlite3
-import numpy as np
+
 
 from CONFIG import *
+
 
 pd.set_option('display.max_columns', None)
 import talib as tb
@@ -19,22 +20,19 @@ def ta_idx(df):
          l = df['low'].values
          v = df['volume'].astype(float).values
 
-
          # define the technical analysis matrix
-
          # Most data series are normalized by their series' mean
          ta = pd.DataFrame()
          ta['MA5'] = tb.MA(c, timeperiod=5) / np.nanmean(tb.MA(c, timeperiod=5))
          ta['MA10'] = tb.MA(c, timeperiod=10) / np.nanmean(tb.MA(c, timeperiod=10))
          ta['vMA5'] = tb.MA(v, timeperiod=5) / np.nanmean(tb.MA(v, timeperiod=5))
          ta['vMA10'] = tb.MA(v, timeperiod=10) / np.nanmean(tb.MA(v, timeperiod=10))
-
-         # ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
-         # ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
+         ta['MA20'] = tb.MA(c, timeperiod=20) / np.nanmean(tb.MA(c, timeperiod=20))
+         ta['vMA20'] = tb.MA(v, timeperiod=20) / np.nanmean(tb.MA(v, timeperiod=20))
          ta['ADX'] = tb.ADX(h, l, c, timeperiod=6) / np.nanmean(tb.ADX(h, l, c, timeperiod=6))
          ta['ADXR'] = tb.ADXR(h, l, c, timeperiod=6) / np.nanmean(tb.ADXR(h, l, c, timeperiod=6))
-         # ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
-         #              np.nanmean(tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0])
+         ta['MACD'] = tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0] / \
+                      np.nanmean(tb.MACD(c, fastperiod=12, slowperiod=26, signalperiod=9)[0])
          ta['RSI'] = tb.RSI(c, timeperiod=5) / np.nanmean(tb.RSI(c, timeperiod=5))
          ta['BBANDS_U'] = tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[0] / \
                           np.nanmean(tb.BBANDS(c, timeperiod=5, nbdevup=2, nbdevdn=2, matype=0)[0])
@@ -106,6 +104,9 @@ def get_base():
     df_o['h']=df_o['tm_key'].dt.hour
     df_o['h'] = np.where(df_o.h <8, df_o.h+24, df_o.h)
     df_o['m']= df_o['tm_key'].dt.minute
+    df_o['oclock'] =  np.where(df_o.m < 30, df_o.m, 60-df_o.m)
+    df_o['oclock'] = 1/(df_o['oclock'] +1)
+
 
     df_o['mm'] = (df_o.h - 8) * 60 + df_o.m
     df_o['m_diff'] = (df_o['mm'] - df_o['mm'].shift(1)).fillna(0)
@@ -171,7 +172,7 @@ def save():
     print("-------------ADJ---------------")
     print(adj_df.head(30))
 
-Day = namedtuple('day', ['dt', OBS, BASE, PRICE])
+
 
 
 def _load(target, trim ):
@@ -203,7 +204,7 @@ def _load(target, trim ):
     return all_days
 
 def load_ml():
-    return  _load(['re1', 're2' ]
+    return  _load(['re1', 're2', 're5' ]
                  , ['st_dt','transaction','m_diff' ,'re1', 're2', 're3', 're4', 're5' ])
 
 
@@ -219,6 +220,28 @@ def load_trainset(size=100):
     valid = test + tri
     print("TRAIN on: {} DAYS".format(len(train)))
     return train, valid, test, tri
+
+
+
+def load_mix(size=100):
+    buff = 0
+    all_data = load_ml()[-size:]
+    SPEC = DataSpec(all_data)
+
+
+    print(len(all_data))
+    tri_idx = [-1,-4,-7,-10]
+    tri_idx.reverse()
+    tri = [all_data[i] for i in tri_idx]
+    print(len(tri))
+    train = [ x for x in all_data if x not in tri]
+    check = train[-len(tri_idx):]
+
+    valid = check + tri
+    print("TRAIN on: {} DAYS".format(len(train)))
+    print("TRAIN ON: ", [d.dt for d in train])
+    print("TEST ON: ", [d.dt for d in tri])
+    return SPEC, train, valid, check, tri
 
 
 

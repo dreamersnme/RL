@@ -1,15 +1,13 @@
 import random
 import time
-from typing import Dict, Union
 
-from torch.profiler import profile, record_function, ProfilerActivity, tensorboard_trace_handler
 
 from torch.utils.data import DataLoader
 
 from SOL import extractor
 from SOL.DLoader import DLoader
 from SOL.model import *
-from stable_baselines3.common import utils
+from CONFIG import *
 
 device = 'cuda' if th.cuda.is_available() else 'cpu'
 th.manual_seed(777)
@@ -17,9 +15,11 @@ if device == 'cuda':
     th.cuda.manual_seed_all(777)
 
 
-learning_rate = 0.00001
-batch_size = 500
-epochs = 5000
+# learning_rate = 0.001
+# batch_size = 500
+learning_rate = 0.001
+batch_size = 512
+epochs = 6000
 eval_interval = 10
 
 
@@ -90,8 +90,8 @@ def valall(model, dataset):
         multi_sum = np.zeros(dataset.spec.price_len)
         for data, target, _ in test_loader:
             pred = model(data)[:,:dataset.spec.price_len].cpu().numpy()
-            pred = dataset.denorm_target(pred)
-            true = dataset.denorm_target(target.cpu().numpy())
+            pred = dataset.spec.denorm_target(pred)
+            true = dataset.spec.denorm_target(target.cpu().numpy())
             diff = np.sum(np.abs(pred[:,0]-true[:,0]))
             sum +=np.sum(diff)
             multi_diff = np.sum(np.abs(pred-true), axis=0)
@@ -112,9 +112,9 @@ def val_loss(model, dataset):
             hypothesis = model(data)
             loss = eval_rmse(hypothesis, target)
             avg_loss += loss / len(test_loader)
-        print('Loss Eval: {:>.4}'.format(avg_loss))
+
     model.train()
-    return avg_loss
+    return avg_loss.cpu().numpy().item()
 
 
 def val(model, dataset):
@@ -143,6 +143,7 @@ def val(model, dataset):
 
 
 
+
 class CECK():
     best_loss = 1000
     file_name = PRETRAINED
@@ -150,6 +151,7 @@ class CECK():
         loss = loss.cpu().detach().numpy()
         if loss <= self.best_loss:
             th.save(model.state_dict(), self.file_name)
+            # th.save(model.extra)
             print("SAVED: ", loss)
             self.best_loss = loss
 
@@ -157,14 +159,15 @@ class CECK():
 
         try:
             model = OutterModel(spec).to(device)
-            model.load_state_dict(th.load(self.file_name))
+            # model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
             return OutterModel(spec).to(device)
 
 
-def train(traindata, testdata, validdatae):
+def train(traindata, testdata, validdatae, val_day_list):
+
     ckp = CECK()
     train_loader = DataLoader(traindata, batch_size=batch_size, shuffle= True)
     model = ckp.load(traindata.spec)
@@ -197,24 +200,27 @@ def train(traindata, testdata, validdatae):
         ckp.save_best(model, avg_loss)
         if (epoch +1)%eval_interval ==0:
             now = time.time()
-
             print('==== [Epoch: {:>4}] loss = {:>.4}'.format(epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
             total_time =0
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
             valall(model, validdatae)
-            loss = val_loss(model, testdata)
-            loss += val_loss(model, validdatae)
-            print('AVG: {:>.4}'.format(loss/2))
+            loss1 = val_loss(model, testdata)
+            loss2 = val_loss(model, validdatae)
+            print('Loss Eval: {:>.4}'.format(loss1))
+            print('Loss Eval: {:>.4}'.format(loss2))
+            print('AVG: {:>.4}'.format((loss1+loss2)/2))
+            print("DAYS:  ", [ np.round(val_loss(model, dd),2) for dd in  val_day_list])
+
             start_tim = now
 
 
-
 if __name__ == '__main__':
-    t_data, valid, test, tri = extractor.load_trainset(TRAIN_TARGET)
-    REF = DataSpec (t_data[0])
+    REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
 
     data = DLoader(t_data, REF)
-    test = DLoader(test, REF, data.normalizer)
-    valid = DLoader(tri, REF, data.normalizer)
-    train(data,test, valid)
+    test = DLoader(test, REF)
+    tri = DLoader(tri, REF)
+    valid_list = [DLoader([dd], REF) for dd in valid]
+
+    train( data,test, tri, valid_list )
