@@ -70,39 +70,24 @@ class Incept(nn.Module):
         each_in = int(each / 2)
         # each_in = each
         denseout = inter_out - each * (layer - 1)
-
+        nn.La
         self.dense = nn.Sequential(
+            # nn.BatchNorm1d(inch),
             nn.Conv1d(inch, denseout, kernel_size=1, stride=1),
-            nn.BatchNorm1d(denseout))
-
-        self.conv2 = nn.Sequential(
-            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
-            nn.BatchNorm1d(each_in),
-            nn.Mish(),
-            nn.Conv1d(each_in, each, kernel_size=2, stride=1),
-            nn.BatchNorm1d(each)
+            # nn.BatchNorm1d(denseout)
         )
 
-        self.conv3 = nn.Sequential(
-            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
-            nn.BatchNorm1d(each_in),
-            nn.Mish(),
-            nn.Conv1d(each_in, each, kernel_size=3, stride=1),
-            nn.BatchNorm1d(each)
-        )
-
-        self.conv5 = nn.Sequential(
-            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
-            nn.BatchNorm1d(each_in), nn.Mish(),
-            nn.Conv1d(each_in, each, kernel_size=5, stride=1),
-            nn.BatchNorm1d(each)
-        )
+        self.conv2 = self.conv_module(2, inch, each_in, each)
+        self.conv3 = self.conv_module(3, inch, each_in, each)
+        self.conv5 = self.conv_module(5, inch, each_in, each)
 
         self.maxpool = nn.Sequential(
+            # nn.BatchNorm1d(inch),
             nn.MaxPool1d(kernel_size=5, stride=1),
-            # nn.BatchNorm1d(inch), nn.Mish(),
+            nn.Mish(),
+            # nn.BatchNorm1d(inch),
             nn.Conv1d(inch, each, kernel_size=1, stride=1),
-            nn.BatchNorm1d(each)
+            # nn.BatchNorm1d(each)
         )
         # self.minpool = nn.Sequential(
         #     nn.MaxPool1d(kernel_size=4, stride=1),
@@ -110,8 +95,17 @@ class Incept(nn.Module):
         #     nn.Conv1d(inch, each, kernel_size=1, stride=1),
         #     nn.BatchNorm1d(each)
         # )
-        self.act = nn.Mish()
+        self.act =nn.Sequential( nn.Mish(), nn.BatchNorm1d(outch))
         self.reduce_seq = 4
+
+    def conv_module(self, span, inch, each_in, each):
+        return nn.Sequential(
+            # nn.BatchNorm1d(inch),
+            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
+            nn.Mish(),
+            # nn.BatchNorm1d(each_in),
+            nn.Conv1d(each_in, each, kernel_size=span, stride=1),
+        )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         dense = self.dense(observations[:, :, self.reduce_seq:])
@@ -140,13 +134,16 @@ class SeqCNN(nn.Module):
             network.append(resnet)
             res_inch = res_outch
 
-        inter_dim = int ( (res_inch + out_dim)/2)
-        self.out = nn.Sequential(nn.Dropout(0.4), nn.Linear(res_inch, inter_dim),
-                                 nn.BatchNorm1d(inter_dim), nn.Mish(),
-                                 nn.Dropout(0.4),
-                                 nn.Linear(inter_dim, out_dim),
-                                 nn.BatchNorm1d(out_dim), nn.Tanh()
-                                 )
+        inter_dim = int((res_inch + out_dim) / 2)
+        self.out = nn.Sequential(
+            # nn.BatchNorm1d(res_inch),
+            nn.Dropout(0.4),
+            nn.Linear(res_inch, inter_dim),
+            nn.Mish(), nn.BatchNorm1d(inter_dim),
+            nn.Dropout(0.4),
+            nn.Linear(inter_dim, out_dim),
+            # nn.BatchNorm1d(out_dim),
+            nn.Tanh())
 
         self.network = nn.Sequential(*network)
         self.feature_concat_dim = res_mulitple[-1] * init_ch

@@ -72,7 +72,7 @@ class DLoader(Dataset):
         return ({OBS:obs, BASE:day[BASE]}, day[PRICE][e_idx], day[DIRECT][e_idx])
 
     def __len__(self):
-        return self.daily_idx[-1]
+        return int(self.daily_idx[-1])
 
 
 if __name__ == "__main__":

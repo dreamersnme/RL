@@ -17,9 +17,9 @@ if device == 'cuda':
 
 # learning_rate = 0.001
 # batch_size = 500
-learning_rate = 0.001
+
 batch_size = 512
-epochs = 6000
+epochs = 1000
 eval_interval = 10
 
 
@@ -104,7 +104,7 @@ def valall(model, dataset):
 eval_rmse = nn.MSELoss().to(device)
 def val_loss(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=1000)
+    test_loader = DataLoader(dataset, batch_size=dataset.__len__())
     with th.no_grad():
         avg_loss = 0
         for data, target, direction in test_loader:
@@ -119,7 +119,7 @@ def val_loss(model, dataset):
 
 def val(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=2000)
+    test_loader = DataLoader(dataset, batch_size=dataset.__len__())
     with th.no_grad():
         sum = 0
         pre_cnt = 0
@@ -166,7 +166,7 @@ class CECK():
             return OutterModel(spec).to(device)
 
 
-def train(traindata, testdata, validdatae, val_day_list):
+def train(learning_rate, traindata, testdata, validdatae, val_day_list):
 
     ckp = CECK()
     train_loader = DataLoader(traindata, batch_size=batch_size, shuffle= True)
@@ -219,10 +219,15 @@ def train(traindata, testdata, validdatae, val_day_list):
 
 if __name__ == '__main__':
     REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
+    # t_data = t_data[-4:-2]
 
     dataD = DLoader(t_data, REF)
-    testD = DLoader(test, REF)
+    testD = DLoader(t_data, REF)
     triD = DLoader(tri, REF)
-    valid_list = [DLoader([dd], REF) for dd in t_data ]
-
-    train( dataD,testD, triD, valid_list )
+    valid_list = [DLoader([dd], REF) for dd in t_data + tri ]
+    learning_rate = 0.002
+    iter = 6
+    for i in range(iter):
+        learning_rate= learning_rate *0.5
+        print(i, "LLLRRRR :", learning_rate, " for Epoch:", epochs)
+        train(learning_rate, dataD,testD, triD, valid_list )
