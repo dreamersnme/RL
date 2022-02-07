@@ -159,7 +159,7 @@ class CECK():
 
         try:
             model = OutterModel(spec).to(device)
-            # model.load_state_dict(th.load(self.file_name))
+            model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
@@ -196,8 +196,10 @@ def train(traindata, testdata, validdatae, val_day_list):
             loss.backward()
             optimizer.step()
             avg_loss += loss / len(train_loader)  # loss 값을 변수에 누적하고 train_loader의 개수로 나눔 = 평균
+
         total_time += time.time()-start
         ckp.save_best(model, avg_loss)
+
         if (epoch +1)%eval_interval ==0:
             now = time.time()
             print('==== [Epoch: {:>4}] loss = {:>.4}'.format(epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
@@ -218,9 +220,9 @@ def train(traindata, testdata, validdatae, val_day_list):
 if __name__ == '__main__':
     REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
 
-    data = DLoader(t_data, REF)
-    test = DLoader(test, REF)
-    tri = DLoader(tri, REF)
-    valid_list = [DLoader([dd], REF) for dd in valid]
+    dataD = DLoader(t_data, REF)
+    testD = DLoader(test, REF)
+    triD = DLoader(tri, REF)
+    valid_list = [DLoader([dd], REF) for dd in t_data ]
 
-    train( data,test, tri, valid_list )
+    train( dataD,testD, triD, valid_list )
