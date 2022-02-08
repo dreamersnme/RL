@@ -70,7 +70,7 @@ class Incept(nn.Module):
         each_in = int(each / 2)
         # each_in = each
         denseout = inter_out - each * (layer - 1)
-        nn.La
+
         self.dense = nn.Sequential(
             # nn.BatchNorm1d(inch),
             nn.Conv1d(inch, denseout, kernel_size=1, stride=1),
@@ -95,7 +95,8 @@ class Incept(nn.Module):
         #     nn.Conv1d(inch, each, kernel_size=1, stride=1),
         #     nn.BatchNorm1d(each)
         # )
-        self.act =nn.Sequential( nn.Mish(), nn.BatchNorm1d(outch))
+        # self.act =nn.Sequential( nn.Mish(), nn.BatchNorm1d(outch))
+        self.act = nn.Mish()
         self.reduce_seq = 4
 
     def conv_module(self, span, inch, each_in, each):
@@ -142,7 +143,7 @@ class SeqCNN(nn.Module):
             nn.Mish(), nn.BatchNorm1d(inter_dim),
             nn.Dropout(0.4),
             nn.Linear(inter_dim, out_dim),
-            # nn.BatchNorm1d(out_dim),
+            nn.BatchNorm1d(out_dim),
             nn.Tanh())
 
         self.network = nn.Sequential(*network)
