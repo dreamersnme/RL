@@ -2,7 +2,7 @@ import os
 from collections import OrderedDict, namedtuple
 import numpy as np
 from gym import spaces
-from SOL.normalizer import Standardizer
+from SOL.normalizer import Standardizer, Normalizer
 
 TRAIN_TARGET =20 #20 #12
 TIC = 0.01
@@ -46,7 +46,8 @@ class DataSpec:
     def denorm_target(self, target): return self.scaler.denormalize(PRICE, target)
 
 
-scaler = Standardizer
+scaler = Normalizer
+# scaler = Standardizer
 class Scaler:
     def __init__(self, data, spec):
         obsN = scaler(shape=(spec.obs_len,))
@@ -61,10 +62,17 @@ class Scaler:
     def normalize(self, key, obs):
         return self.scalers[key].norm(obs)
 
+    def denormalize(self, key, data):
+        return self.scalers[key].denorm(data)
+
     def norm_data(self, data):
         data = [Day(ori.dt,  self.scalers[OBS].norm(ori.obs)
                     , self.scalers[BASE].norm(ori.base)
                     , self.scalers[PRICE].norm(ori.price) ) for ori in data]
         return data
-    def denormalize(self, key, data):
-        return self.scalers[key].denorm(data)
+
+    def denorm_data(self, data):
+        data = [Day(ori.dt,  self.scalers[OBS].denorm(ori.obs)
+                    , self.scalers[BASE].denorm(ori.base)
+                    , self.scalers[PRICE].denorm(ori.price) ) for ori in data]
+        return data

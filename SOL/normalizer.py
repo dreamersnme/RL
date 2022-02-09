@@ -48,3 +48,33 @@ class Standardizer(RunningMeanStd):
         return ((obs - self.mean) / np.sqrt(self.var + self.epsilon)).astype(np.float32)
     def denorm(self, data):
         return (data * np.sqrt (self.var + self.epsilon)) + self.mean
+
+
+class Normalizer:
+    norm_val = 0.95
+    def __init__(self, shape: Tuple[int, ...] = ()):
+        self.min = None
+        self.max = None
+
+    def update(self, arr: np.ndarray) -> None:
+        batch_min = np.min(arr, axis=0)
+        batch_max = np.max(arr, axis=0)
+        self.min = batch_min if self.min is None else np.minimum(batch_min, self.min)
+        self.max = batch_max if self.max is None else np.maximum(batch_max, self.max)
+
+        self.gap = self.max - self.min
+
+
+    def norm(self, obs):
+        norm1 = ( (obs - self.min) / self.gap)
+        norm1 = self.norm_val * norm1
+        norm2 = np.clip(norm1, 0, 1)
+        return norm2
+
+    def denorm(self, data):
+        cliped  = np.clip(data, 0, 1)
+        denorm1 =  cliped / self.norm_val
+        denorm2 = (denorm1 * self.gap) + self.min
+        return denorm2
+
+

@@ -124,6 +124,7 @@ class SeqCNN(nn.Module):
         network = []
 
         res_mulitple = [10, 20, 10, 10]
+        # res_mulitple = [10, 20, 20, 20]
 
         res_inch = init_ch
         req_reduce_sum = 0
@@ -137,13 +138,14 @@ class SeqCNN(nn.Module):
 
         inter_dim = int((res_inch + out_dim) / 2)
         self.out = nn.Sequential(
-            # nn.BatchNorm1d(res_inch),
+            nn.BatchNorm1d(res_inch),
             nn.Dropout(0.4),
             nn.Linear(res_inch, inter_dim),
-            nn.Mish(), nn.BatchNorm1d(inter_dim),
+            nn.Mish(),
+            # nn.BatchNorm1d(inter_dim),
             nn.Dropout(0.4),
             nn.Linear(inter_dim, out_dim),
-            nn.BatchNorm1d(out_dim),
+            # nn.BatchNorm1d(out_dim),
             nn.Tanh())
 
         self.network = nn.Sequential(*network)

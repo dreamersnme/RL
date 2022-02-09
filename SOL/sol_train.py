@@ -17,7 +17,7 @@ if device == 'cuda':
 
 # learning_rate = 0.001
 # batch_size = 500
-
+learning_rate = 0.001
 batch_size = 512
 epochs = 1000
 eval_interval = 10
@@ -219,13 +219,12 @@ def train(learning_rate, traindata, testdata, validdatae, val_day_list):
 
 if __name__ == '__main__':
     REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
-    # t_data = t_data[-4:-2]
 
     dataD = DLoader(t_data, REF)
-    testD = DLoader(t_data, REF)
+    testD = DLoader(test, REF)
     triD = DLoader(tri, REF)
     valid_list = [DLoader([dd], REF) for dd in t_data + tri ]
-    learning_rate = 0.002
+
     iter = 6
     for i in range(iter):
         learning_rate= learning_rate *0.5
