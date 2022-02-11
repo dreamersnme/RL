@@ -2,7 +2,7 @@ import os
 from collections import OrderedDict, namedtuple
 import numpy as np
 from gym import spaces
-from SOL.normalizer import Standardizer, Normalizer
+from SOL.normalizer import Standardizer, Normalizer, BothScaler
 
 TRAIN_TARGET =20 #20 #12
 TIC = 0.01
@@ -26,6 +26,10 @@ PRETRAINED = os.path.join(MODEL_DIR, "best_model.pt")
 PREDICTOR = os.path.join(MODEL_DIR, "best_feature_extractor.pt")
 Day = namedtuple('day', ['dt', OBS, BASE, PRICE])
 
+# scaler = Normalizer
+# scaler = Standardizer
+scaler = BothScaler
+
 class DataSpec:
     obs_seq = 17
     ta_seq = 5
@@ -34,6 +38,10 @@ class DataSpec:
         ref = ori_data[0]
         self.obs_len = ref.obs.shape[1]
         self.base_len = ref.base.shape[0]
+        if scaler == BothScaler:
+            self.obs_len = self.obs_len*2
+            self.base_len = self.base_len*2
+
         self.price_len = ref.price.shape[1]
         self.scaler = Scaler(ori_data, self)
         obs = spaces.Box (low=-np.inf, high=np.inf, shape=(self.obs_seq, self.obs_len))
@@ -46,13 +54,12 @@ class DataSpec:
     def denorm_target(self, target): return self.scaler.denormalize(PRICE, target)
 
 
-scaler = Normalizer
-# scaler = Standardizer
+
 class Scaler:
     def __init__(self, data, spec):
         obsN = scaler(shape=(spec.obs_len,))
         baseN = scaler(shape=(spec.base_len,))
-        priceN = scaler(shape=(spec.price_len,))
+        priceN = Standardizer(shape=(spec.price_len,))
         for day in data:
             obsN.update(day.obs)
             baseN.update(day.base)
