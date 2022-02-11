@@ -124,28 +124,31 @@ class SeqCNN(nn.Module):
         network = []
 
         res_mulitple = [10, 20, 10, 10]
-        # res_mulitple = [10, 20, 20, 20]
 
+
+        network.append(nn.Conv1d(init_ch, int(init_ch/2), kernel_size=1, stride=1))
+
+        init_ch = int(init_ch/2)
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
             res_outch = int(init_ch * res)
             resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
-            network.append(nn.Dropout(0.4))
+            network.append(nn.Dropout(0.6))
             network.append(resnet)
             res_inch = res_outch
 
         inter_dim = int((res_inch + out_dim) / 2)
         self.out = nn.Sequential(
-            nn.BatchNorm1d(res_inch),
-            nn.Dropout(0.4),
+            # nn.BatchNorm1d(res_inch),
+            nn.Dropout(0.6),
             nn.Linear(res_inch, inter_dim),
             nn.Mish(),
             # nn.BatchNorm1d(inter_dim),
-            nn.Dropout(0.4),
+            nn.Dropout(0.6),
             nn.Linear(inter_dim, out_dim),
-            # nn.BatchNorm1d(out_dim),
+            nn.BatchNorm1d(out_dim),
             nn.Tanh())
 
         self.network = nn.Sequential(*network)
