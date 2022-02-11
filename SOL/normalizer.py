@@ -45,9 +45,9 @@ class Standardizer(RunningMeanStd):
     def __init__(self, shape):
         super(Standardizer,self).__init__(shape=shape)
     def norm(self, obs):
-        return ((obs - self.mean) / np.sqrt(self.var + self.epsilon)).astype(np.float32)
+        return np.clip(((obs - self.mean) / np.sqrt(self.var + self.epsilon)).astype(np.float32), -5, 5)
     def denorm(self, data):
-        return (data * np.sqrt (self.var + self.epsilon)) + self.mean
+        return ( np.clip(data, -5, 5) * np.sqrt (self.var + self.epsilon)) + self.mean
 
 
 class Normalizer:
@@ -77,4 +77,26 @@ class Normalizer:
         denorm2 = (denorm1 * self.gap) + self.min
         return denorm2
 
+
+class BothScaler:
+    def __init__(self, shape: Tuple[int, ...] = ()):
+        shape = [ int(a/2) for a in list(shape)]
+        shape = tuple(shape)
+        self.NORMALI = Normalizer(shape=shape)
+        self.STAND = Standardizer(shape=shape)
+
+    def update(self, arr: np.ndarray) -> None:
+        self.NORMALI.update(arr)
+        self.STAND.update(arr)
+
+    def norm(self, obs):
+        norm1 = self.NORMALI.norm(obs)
+        norm2 =  self.STAND.norm(obs)
+        return np.concatenate((norm1, norm2), axis=-1)
+
+    def denorm(self, data):
+        size = data.shape[-1]
+        size = int(size/2)
+        data = data[..., :size]
+        return self.NORMALI.denorm(data)
 
