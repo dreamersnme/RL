@@ -74,7 +74,6 @@ class Incept(nn.Module):
         self.dense = nn.Sequential(
             # nn.BatchNorm1d(inch),
             nn.Conv1d(inch, denseout, kernel_size=1, stride=1),
-            # nn.BatchNorm1d(denseout)
         )
 
         self.conv2 = self.conv_module(2, inch, each_in, each)
@@ -126,7 +125,7 @@ class SeqCNN(nn.Module):
         res_mulitple = [10, 20, 10, 10]
 
 
-        network.append(nn.Conv1d(init_ch, int(init_ch/2), kernel_size=1, stride=1))
+        network.extend([ nn.Conv1d(init_ch, int(init_ch/2), kernel_size=1, stride=1), nn.Mish()])
 
         init_ch = int(init_ch/2)
         res_inch = init_ch
@@ -135,7 +134,7 @@ class SeqCNN(nn.Module):
             res_outch = int(init_ch * res)
             resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
-            network.append(nn.Dropout(0.6))
+            network.append(nn.Dropout(0.4))
             network.append(resnet)
             res_inch = res_outch
 
