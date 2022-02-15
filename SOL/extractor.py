@@ -62,8 +62,9 @@ def ta_idx(df):
     return ta
 
 
+lags = [5, 10, 20, 30, 60]
 def lag_minmax(close):
-    lags = [5, 10, 20, 30, 60]
+
     columns = []
     for lag in lags:
         columns.extend ([f'minval{lag}', f'minidx{lag}', f'maxval{lag}', f'maxidx{lag}'])
@@ -75,10 +76,11 @@ def lag_minmax(close):
         result = []
         for lag in lags:
             target = close.loc[max (0, idx - lag + 1):idx][::-1]
+            my =  close.loc[idx]
             min_idx = target.idxmin () - idx
-            min_val = target.min ()
+            min_val = my - target.min ()
             max_idx = target.idxmax () - idx
-            max_val = target.max ()
+            max_val = target.max () - my
             result.extend ([min_val, min_idx, max_val, max_idx])
         df.loc[idx] = result
 
@@ -152,7 +154,12 @@ def adj(df, base):
     df = pd.merge (left=df, right=base2, how="left", on='st_dt')
     df['volume'] = df.volume / df.volume_mean
 
-    prices = ['open', 'high', 'low', 'close', 'transaction', 'maxval5', 'maxval10', 'maxval20', 'minval5', 'minval10', 'minval20']
+    prices = ['open', 'high', 'low', 'close', 'transaction']
+    # for ii in lags:
+    #     prices.append("maxval"+str(ii))
+    #     prices.append("minval" + str(ii))
+
+
     for name in prices:
         df[name] = df[name] - df.base_price
 
@@ -207,7 +214,7 @@ def _load(target, trim):
 
 
 def load_ml():
-    return _load (['re1', 're2', 're5']
+    return _load (['re1']
                   , ['st_dt', 'transaction', 'm_diff', 're1', 're2', 're3', 're4', 're5'])
 
 

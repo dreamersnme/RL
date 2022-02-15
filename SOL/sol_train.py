@@ -17,7 +17,7 @@ if device == 'cuda':
 
 # learning_rate = 0.001
 # batch_size = 500
-learning_rate = 0.001
+learning_rate = 0.002
 batch_size = 512
 epochs = 1000
 eval_interval = 10
@@ -166,7 +166,7 @@ class CECK():
             return OutterModel(spec).to(device)
 
 
-def train(learning_rate, traindata, testdata, validdatae, val_day_list):
+def train(iter, learning_rate, traindata, testdata, validdatae, val_day_list):
 
     ckp = CECK()
     train_loader = DataLoader(traindata, batch_size=batch_size, shuffle= True)
@@ -202,7 +202,7 @@ def train(learning_rate, traindata, testdata, validdatae, val_day_list):
 
         if (epoch +1)%eval_interval ==0:
             now = time.time()
-            print('==== [Epoch: {:>4}] loss = {:>.4}'.format(epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
+            print('==== [Epoch{}: {:>4}] loss = {:>.4}'.format(iter, epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
             total_time =0
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
@@ -221,7 +221,7 @@ if __name__ == '__main__':
     REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
 
     dataD = DLoader(t_data, REF)
-    testD = DLoader(test, REF)
+    testD = DLoader(t_data, REF)
     triD = DLoader(tri, REF)
     valid_list = [DLoader([dd], REF) for dd in t_data + tri ]
 
@@ -229,4 +229,4 @@ if __name__ == '__main__':
     for i in range(iter):
         learning_rate= learning_rate *0.5
         print(i, "LLLRRRR :", learning_rate, " for Epoch:", epochs)
-        train(learning_rate, dataD,testD, triD, valid_list )
+        train(i, learning_rate, dataD,testD, triD, valid_list)

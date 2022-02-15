@@ -22,43 +22,6 @@ class LstmLast(nn.Module):
             return out[:, -self.last_seq:]
 
 
-class ResNet(nn.Module):
-    def __init__(self, inch, outch, span=3):
-        super(ResNet, self).__init__()
-        inter = int(inch / 3)
-        self.reduce_seq = span - 1
-        self.conv = nn.Sequential(
-            nn.Conv2d(inch, inter, kernel_size=1, stride=1),
-            nn.BatchNorm2d(inter),
-            nn.Mish(),
-            # nn.ZeroPad2d ((0, 0, span-1, 0)),
-            nn.Conv2d(inter, inter, kernel_size=(span, 1), stride=1),
-            nn.BatchNorm2d(inter),
-            nn.Mish(),
-            nn.Conv2d(inter, outch, kernel_size=1, stride=1),
-            nn.BatchNorm2d(outch)
-        )
-
-        self.maxpool = nn.Sequential(
-            nn.MaxPool2d(kernel_size=(span, 1), stride=1),
-            # nn.ZeroPad2d ((0, 0, span - 1, 0)),
-            nn.Conv2d(inch, outch, kernel_size=1, stride=1),
-            nn.BatchNorm2d(outch))
-
-        if inch == outch:
-            self.shortcut = nn.Sequential()
-        else:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(inch, outch, kernel_size=1, stride=1),
-                nn.BatchNorm2d(outch))
-
-        self.act = nn.Mish()
-
-    def forward(self, observations: th.Tensor) -> th.Tensor:
-        conv = self.conv(observations)
-        maxpool = self.maxpool(observations)
-        shortcut = self.shortcut(observations)[:, :, self.reduce_seq:]
-        return self.act(conv + maxpool + shortcut)
 
 
 class Incept(nn.Module):
@@ -67,8 +30,9 @@ class Incept(nn.Module):
         layer = 5
         inter_out = outch
         each = int(inter_out / layer)
-        each_in = int(each / 2)
+        # each_in = int(each / 2)
         # each_in = each
+        each_in = inch
         denseout = inter_out - each * (layer - 1)
 
         self.dense = nn.Sequential(
@@ -83,7 +47,7 @@ class Incept(nn.Module):
         self.maxpool = nn.Sequential(
             # nn.BatchNorm1d(inch),
             nn.MaxPool1d(kernel_size=5, stride=1),
-            nn.Mish(),
+            # nn.Mish(),
             # nn.BatchNorm1d(inch),
             nn.Conv1d(inch, each, kernel_size=1, stride=1),
             # nn.BatchNorm1d(each)
@@ -101,8 +65,8 @@ class Incept(nn.Module):
     def conv_module(self, span, inch, each_in, each):
         return nn.Sequential(
             # nn.BatchNorm1d(inch),
-            nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
-            nn.Mish(),
+            # nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
+            # nn.Mish(),
             # nn.BatchNorm1d(each_in),
             nn.Conv1d(each_in, each, kernel_size=span, stride=1),
         )
@@ -121,30 +85,39 @@ class SeqCNN(nn.Module):
     def __init__(self, seq_len, init_ch, out_dim):
         super(SeqCNN, self).__init__()
         network = []
+        init_ch = init_ch*2
+        # res_mulitple = [10, 20, 10, 10]
 
-        res_mulitple = [10, 20, 10, 10]
+        res_mulitple = [1, 1, 1, 1]
 
+        inter_dim = int(init_ch/0.5)
+        network.extend([ nn.Conv1d(init_ch, inter_dim, kernel_size=1, stride=1),
+                         nn.BatchNorm1d(inter_dim),
+                         nn.Tanh(),
+                         nn.Dropout(0.4)
+                         ])
 
-        network.extend([ nn.Conv1d(init_ch, int(init_ch/2), kernel_size=1, stride=1), nn.Mish()])
-
-        init_ch = int(init_ch/2)
+        init_ch = inter_dim
         res_inch = init_ch
         req_reduce_sum = 0
         for res in res_mulitple:
             res_outch = int(init_ch * res)
             resnet = Incept(res_inch, res_outch)
             req_reduce_sum += resnet.reduce_seq
-            network.append(nn.Dropout(0.4))
+            #
             network.append(resnet)
+            network.append(nn.Dropout(0.4))
             res_inch = res_outch
 
         inter_dim = int((res_inch + out_dim) / 2)
+        inter_dim = res_inch
+
         self.out = nn.Sequential(
-            # nn.BatchNorm1d(res_inch),
-            nn.Dropout(0.6),
-            nn.Linear(res_inch, inter_dim),
-            nn.Mish(),
-            # nn.BatchNorm1d(inter_dim),
+
+            # nn.Dropout(0.4),
+            # nn.Linear(res_inch, inter_dim),
+            # nn.Mish(),
+
             nn.Dropout(0.6),
             nn.Linear(inter_dim, out_dim),
             nn.BatchNorm1d(out_dim),
@@ -155,7 +128,9 @@ class SeqCNN(nn.Module):
         self.seq = seq_len - req_reduce_sum
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        xx = self.network(observations.transpose(-2, -1)).transpose(-2, -1)[:, -1]
+        obs = th.concat( (observations, -observations), axis = -1)
+        obs = obs.transpose(-2, -1)
+        xx = self.network(obs).transpose(-2, -1)[:, -1]
         return self.out(xx)
 
 

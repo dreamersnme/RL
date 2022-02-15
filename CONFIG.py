@@ -27,8 +27,8 @@ PREDICTOR = os.path.join(MODEL_DIR, "best_feature_extractor.pt")
 Day = namedtuple('day', ['dt', OBS, BASE, PRICE])
 
 # scaler = Normalizer
-# scaler = Standardizer
-scaler = BothScaler
+scaler = Standardizer
+# scaler = BothScaler
 
 class DataSpec:
     obs_seq = 17
