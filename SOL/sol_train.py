@@ -6,8 +6,10 @@ from torch.utils.data import DataLoader
 
 from SOL import extractor
 from SOL.DLoader import DLoader
+from SOL.extractor import Extractor
 from SOL.model import *
 from CONFIG import *
+
 
 device = 'cuda' if th.cuda.is_available() else 'cpu'
 th.manual_seed(777)
@@ -84,7 +86,7 @@ def trade(pred,price_len, target, denormali):
 
 def valall(model, dataset):
     model.eval()
-    test_loader = DataLoader(dataset, batch_size=1000)
+    test_loader = DataLoader(dataset, batch_size=dataset.__len__())
     with th.no_grad():
         sum = 0
         multi_sum = np.zeros(dataset.spec.price_len)
@@ -93,9 +95,8 @@ def valall(model, dataset):
             pred = dataset.spec.denorm_target(pred)
             true = dataset.spec.denorm_target(target.cpu().numpy())
             diff = np.sum(np.abs(pred[:,0]-true[:,0]))
-            sum +=np.sum(diff)
+            sum += np.sum(diff)
             multi_diff = np.sum(np.abs(pred-true), axis=0)
-
             multi_sum = multi_sum+multi_diff
 
         print('Eval diff: {:>.3}'.format(sum/dataset.__len__()), "  S:", np.round(multi_sum/dataset.__len__(), 3))
@@ -156,14 +157,20 @@ class CECK():
             self.best_loss = loss
 
     def load(self, spec):
-
         try:
             model = OutterModel(spec).to(device)
             model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
-            return OutterModel(spec).to(device)
+            model = OutterModel(spec).to(device)
+            model.printsummary()
+            return model
+
+def predictor_test(model):
+    from SOL.predictor import Predictor
+    model = Predictor(model)
+    model.price_test()
 
 
 def train(iter, learning_rate, traindata, testdata, validdatae, val_day_list):
@@ -191,7 +198,6 @@ def train(iter, learning_rate, traindata, testdata, validdatae, val_day_list):
             target = th.cat([target, direction], dim=1)
             optimizer.zero_grad()
             hypothesis = model(data)
-
             loss = rmse(hypothesis, target)
             loss.backward()
             optimizer.step()
@@ -202,7 +208,7 @@ def train(iter, learning_rate, traindata, testdata, validdatae, val_day_list):
 
         if (epoch +1)%eval_interval ==0:
             now = time.time()
-            print('==== [Epoch{}: {:>4}] loss = {:>.4}'.format(iter, epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time))
+            print('==== [Epoch{}: {:>4}] loss = {:>.4}'.format(iter, epoch + 1, avg_loss), int(total_time), int((eval_interval*traindata.__len__())/total_time), traindata.day_cnt)
             total_time =0
             print("==== VALID (overlap, all) ===")
             valall(model, testdata)
@@ -214,18 +220,20 @@ def train(iter, learning_rate, traindata, testdata, validdatae, val_day_list):
             print('AVG: {:>.4}'.format((loss1+loss2)/2))
             print("DAYS:  ", [ np.round(val_loss(model, dd),2) for dd in  val_day_list])
 
+            # predictor_test(model)
+
             start_tim = now
 
 
 if __name__ == '__main__':
-    REF, t_data, valid, test, tri = extractor.load_mix(TRAIN_TARGET)
+    REF, t_data, valid, test, tri = Extractor.load()
 
     dataD = DLoader(t_data, REF)
     testD = DLoader(t_data, REF)
     triD = DLoader(tri, REF)
     valid_list = [DLoader([dd], REF) for dd in t_data + tri ]
 
-    iter = 6
+    iter = 8
     for i in range(iter):
         learning_rate= learning_rate *0.5
         print(i, "LLLRRRR :", learning_rate, " for Epoch:", epochs)

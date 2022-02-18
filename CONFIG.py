@@ -31,13 +31,16 @@ scaler = Standardizer
 # scaler = BothScaler
 
 class DataSpec:
-    obs_seq = 17
+    # obs_seq = 17
+    obs_seq = 9
     ta_seq = 5
     stat_len = 1
+    featured_feature =64
     def __init__(self, ori_data):
         ref = ori_data[0]
         self.obs_len = ref.obs.shape[1]
         self.base_len = ref.base.shape[0]
+
         if scaler == BothScaler:
             self.obs_len = self.obs_len*2
             self.base_len = self.base_len*2
@@ -46,11 +49,14 @@ class DataSpec:
         self.scaler = Scaler(ori_data, self)
         obs = spaces.Box (low=-np.inf, high=np.inf, shape=(self.obs_seq, self.obs_len))
         base = spaces.Box (low=-np.inf, high=np.inf, shape=(self.base_len,))
-        stat = spaces.Box (low=-np.inf, high=np.inf, shape=(self.stat_len,))
-        self.observation_space = spaces.Dict (OrderedDict ([(OBS, obs), (BASE, base), (STAT, stat)]))
         self.data_space = spaces.Dict (OrderedDict ([(OBS, obs), (BASE, base)]))
 
+        stat = spaces.Box(low=-MAX_TRADE, high=MAX_TRADE, shape=(self.stat_len,))
+        featured = spaces.Box(low=-1, high=1, shape=(self.featured_feature,))
+        self.observation_space = spaces.Dict(OrderedDict([(OBS, featured), (BASE, base), (STAT, stat)]))
+
     def scaling(self, data): return self.scaler.norm_data(data)
+    def norm_obs(self, data): return self.scaler.norm_only_obs(data)
     def denorm_target(self, target): return self.scaler.denormalize(PRICE, target)
 
 
@@ -78,8 +84,16 @@ class Scaler:
                     , self.scalers[PRICE].norm(ori.price) ) for ori in data]
         return data
 
+    def norm_only_obs(self, data):
+        data = [Day(ori.dt,  self.scalers[OBS].norm(ori.obs)
+                    , ori.base
+                    , ori.price ) for ori in data]
+        return data
+
     def denorm_data(self, data):
         data = [Day(ori.dt,  self.scalers[OBS].denorm(ori.obs)
                     , self.scalers[BASE].denorm(ori.base)
                     , self.scalers[PRICE].denorm(ori.price) ) for ori in data]
         return data
+
+

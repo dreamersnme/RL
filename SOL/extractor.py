@@ -238,18 +238,32 @@ def load_mix(size=100):
     SPEC = DataSpec (all_data)
 
     print (len (all_data))
-    tri_idx = [-1, -4, -7, -10]
+    tri_idx = [-1, -4, -7, -10, -12, -16]
     tri_idx.reverse ()
     tri = [all_data[i] for i in tri_idx]
     print (len (tri))
     train = [x for x in all_data if x not in tri]
-    check = train[-len (tri_idx):]
+    check_len=3
+    check = train[-check_len:]
 
     valid = check + tri
     print ("TRAIN on: {} DAYS".format (len (train)))
     print ("TRAIN ON: ", [d.dt for d in train])
     print ("TEST ON: ", [d.dt for d in tri])
     return SPEC, train, valid, check, tri
+
+
+class Extractor:
+    REF, t_data, valid, test, tri = None, None, None, None, None
+
+    @classmethod
+    def load(cls):
+        if cls.REF is None:
+            cls.REF, cls.t_data, cls.valid, cls.test, cls.tri = load_mix(TRAIN_TARGET)
+
+        return cls.REF, cls.t_data, cls.valid, cls.test, cls.tri
+
+
 
 
 if __name__ == '__main__':

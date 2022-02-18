@@ -22,12 +22,23 @@ class LstmLast(nn.Module):
             return out[:, -self.last_seq:]
 
 
+class SpanCutter(nn.Module):
+    def __init__(self, maxspan, span):
+        super(SpanCutter, self).__init__()
+        self.start = maxspan - span
+
+    def forward(self, observations: th.Tensor) -> th.Tensor:
+        return observations[:, :, self.start:]
 
 
 class Incept(nn.Module):
     def __init__(self, inch, outch):
         super(Incept, self).__init__()
-        layer = 5
+
+        convspan = [2,3,4,5]
+        poolspan = [3]
+
+        layer = len(convspan)+len(poolspan) +1
         inter_out = outch
         each = int(inter_out / layer)
         # each_in = int(each / 2)
@@ -35,49 +46,45 @@ class Incept(nn.Module):
         each_in = inch
         denseout = inter_out - each * (layer - 1)
 
-        self.dense = nn.Sequential(
-            # nn.BatchNorm1d(inch),
+        dense = nn.Sequential(
+            SpanCutter(5, 1),
             nn.Conv1d(inch, denseout, kernel_size=1, stride=1),
         )
 
-        self.conv2 = self.conv_module(2, inch, each_in, each)
-        self.conv3 = self.conv_module(3, inch, each_in, each)
-        self.conv5 = self.conv_module(5, inch, each_in, each)
 
-        self.maxpool = nn.Sequential(
-            # nn.BatchNorm1d(inch),
-            nn.MaxPool1d(kernel_size=5, stride=1),
-            # nn.Mish(),
-            # nn.BatchNorm1d(inch),
-            nn.Conv1d(inch, each, kernel_size=1, stride=1),
-            # nn.BatchNorm1d(each)
-        )
-        # self.minpool = nn.Sequential(
-        #     nn.MaxPool1d(kernel_size=4, stride=1),
-        #     nn.BatchNorm1d(inch), nn.Mish(),
-        #     nn.Conv1d(inch, each, kernel_size=1, stride=1),
-        #     nn.BatchNorm1d(each)
-        # )
-        # self.act =nn.Sequential( nn.Mish(), nn.BatchNorm1d(outch))
+        convs=[self.conv_module(ii, inch, each_in, each) for ii in convspan]
+
+
+        pools = [self.max_module(ii, inch, each) for ii in poolspan]
+
+        self.layers = nn.ModuleList([dense] + convs + pools)
+
         self.act = nn.Mish()
         self.reduce_seq = 4
 
     def conv_module(self, span, inch, each_in, each):
         return nn.Sequential(
+            SpanCutter(5, span),
             # nn.BatchNorm1d(inch),
             # nn.Conv1d(inch, each_in, kernel_size=1, stride=1),
             # nn.Mish(),
             # nn.BatchNorm1d(each_in),
             nn.Conv1d(each_in, each, kernel_size=span, stride=1),
         )
+    def max_module(self, span, inch, each):
+        return nn.Sequential(
+            SpanCutter(5, span),
+            nn.MaxPool1d(kernel_size=span, stride=1),
+            # nn.Mish(),
+            # nn.BatchNorm1d(inch),
+            nn.Conv1d(inch, each, kernel_size=1, stride=1),
+            # nn.BatchNorm1d(each)
+        )
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        dense = self.dense(observations[:, :, self.reduce_seq:])
-        conv2 = self.conv2(observations[:, :, self.reduce_seq - 1:])
-        conv3 = self.conv3(observations[:, :, self.reduce_seq - 2:])
-        conv5 = self.conv5(observations)
-        maxpool = self.maxpool(observations)
-        return self.act(th.concat([dense, conv2, conv3, conv5, maxpool], dim=1))
+        out = [layer(observations) for layer in self.layers]
+        out = th.concat(out, dim=1)
+        return self.act(out)
 
 
 class SeqCNN(nn.Module):
@@ -88,9 +95,10 @@ class SeqCNN(nn.Module):
         init_ch = init_ch*2
         # res_mulitple = [10, 20, 10, 10]
 
-        res_mulitple = [1, 1, 1, 1]
+        # res_mulitple = [1, 1, 1, 1]
+        res_mulitple = [2, 1]
 
-        inter_dim = int(init_ch/0.5)
+        inter_dim = int(init_ch/0.7)
         network.extend([ nn.Conv1d(init_ch, inter_dim, kernel_size=1, stride=1),
                          nn.BatchNorm1d(inter_dim),
                          nn.Tanh(),

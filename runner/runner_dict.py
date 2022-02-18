@@ -3,41 +3,42 @@ import shutil
 import time
 
 from torch.utils.tensorboard import SummaryWriter
-import torch as th
-from CONFIG import DataSpec, MODEL_DIR, TRAIN_TARGET
-from SOL import extractor
+
+from CONFIG import *
+
+from SOL.predictor import Predictor
 
 from runner.callbacks import LearnEndCallback
-from sim.env_dy.day_evn import Days
+from sim.env_dy.day_feature_evn import Day_featured
 from stable_baselines3.common.noise import NormalActionNoise
 
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, SubprocVecEnv
 import numpy as np
 
+ENV = Day_featured
 
-traindata, valid, _, _ = extractor.load_trainset(TRAIN_TARGET)
-valid = traindata
-
-
-ENV = Days
-SPEC = DataSpec (traindata[0])
 class IterRun:
     MIN_TRADE = 30
     BOOST_SEARCH = 1
-    unit_episode = len(traindata)
-    roleout_epi = unit_episode * 1
+
     noise_std = 0.4
     adapt_delay = 5
     batch_size = 128
     buffer_size = 1_000_000
 
-    def __init__(self, MODEL, TRANSFER = None, arc=[256, 128], retrain=False,  seed=None):
-        self.TRANSFER = None if TRANSFER is None else self.transfer(TRANSFER)
+    def __init__(self, MODEL, arc=[256,128,64], retrain=False,  seed=None):
+
+        extracted = Predictor()
+        self.traindata = extracted.rl_train
+        self.valid = extracted.rl_valid
+        self.SPEC = extracted.spec
+        self.unit_episode = len(self.traindata)
+        self.roleout_epi = self.unit_episode * 1
 
         self.seed = seed
         self.model_cls = MODEL
         self.name = MODEL.__name__
-        self.test_env =  ENV(valid, SPEC, title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
+        self.test_env =  ENV(self.valid, self.SPEC, title=self.name, verbose=True, plot_dir="./sFig/{}".format(self.name))
         self.env = self.make_env()
         self.writer = self.tensorboard("./summary_all/{}/".format(self.name))
         self.save = os.path.join(MODEL_DIR, f"ckpt_{self.name}")
@@ -45,21 +46,14 @@ class IterRun:
         self.arch = arc
         self.iter = 1
         self.time_recoder = TimeRecode(self.writer)
-        self.init_grad_epoch = int((self.unit_episode * 600) / self.batch_size) * 10
+        self.init_grad_epoch = int((self.unit_episode * 600) / self.batch_size)
         if retrain: pass
         elif self.seed is None: self.init_boost (self.MIN_TRADE)
         else :self.set_same()
 
-    def transfer(self, trained_file):
-        from SOL.model import OutterModel
-        pre_trained = OutterModel(SPEC)
-        print(trained_file)
-        pre_trained.load_state_dict(th.load(trained_file))
-        return pre_trained.module
-
     def make_env(self):
-        env = DummyVecEnv([lambda: ENV(traindata, SPEC, verbose=False)])
-        return VecNormalize(env, norm_obs_keys=["obs", "stat"])
+        env = DummyVecEnv([lambda: ENV(self.traindata, self.SPEC, verbose=False)])
+        return VecNormalize(env)
 
     def init_env(self):
         self.test_env.reset_env()
@@ -85,7 +79,7 @@ class IterRun:
     def init_boost(self, MIN_TRADE, min_reward=-1000):
         print("-----  BOOST UP", self.name)
 
-        test_env = ENV(valid, SPEC, verbose=False)
+        test_env = ENV(self.valid, self.SPEC, verbose=False)
         minimum = -1e8
         suit_model = None
 
@@ -94,7 +88,7 @@ class IterRun:
 
         for iter in range(self.BOOST_SEARCH):
             model = self.unit_model()
-            # if iter == 0: print (model.policy)
+            if iter == 0: print (model.policy)
             eval = self.evaluation(model, test_env)
             reward = eval["1_Reward"]
             count = eval['4_Trade']
@@ -133,38 +127,30 @@ class IterRun:
         if env is None:env = self.env
         seed = self.seed or np.random.randint(1e8)
         model = self.model_cls("MultiInputPolicy", env, verbose=1, action_noise=noise, seed =seed,
-                               gradient_steps= self.init_grad_epoch, gamma=1.0,
+                               gradient_steps= self.init_grad_epoch*10, gamma=1.0,
                                batch_size = self.batch_size, policy_kwargs=policy_kwargs, buffer_size=self.buffer_size,
                                learning_starts=learning_starts)
 
 
-        if self.TRANSFER:
-            print(self.name,"TRANSFER LEARNING")
-            extractors = self.extractors(model)
-            for ex in extractors: ex.load_state_dict(self.TRANSFER.state_dict())
-            self.fix_weight(model)
+
 
         return model
 
-    def extractors(self, model): return [aa.features_extractor.combined for aa in model.actors]
+
 
     def load_model(self, noise):
         model = self.model_cls.load(self.save, env=self.env)
         if self.buffer: model.replay_buffer = self.buffer
         model.set_random_seed (self.seed)
-
-        model.gradient_steps = self.init_grad_epoch \
-                               *  ( 1 + int((model.replay_buffer.size()/self.buffer_size)*10))
+        epoch =  ( 10 + int((model.replay_buffer.size()/self.buffer_size)*20))
+        model.gradient_steps = self.init_grad_epoch *epoch
 
         print("LOADED", self.save, self.iter, model.seed)
         print(self.name, "BUFFER REUSE:", model.replay_buffer.size())
+        print(self.name, "TRAIN EPOCH:", epoch)
         if noise is not None:
             model.action_noise.sigma=noise * np.ones(1)
             print(self.name,"Noise Reset:", noise)
-
-        if self.TRANSFER and self.iter <= self.adapt_delay:
-            print(self.name," FIX EXTRACTOR :", self.iter ,"<", self.adapt_delay)
-            self.fix_weight(model)
 
         return model
 
@@ -177,12 +163,10 @@ class IterRun:
         self.time_recoder.start()
         self.seed = np.random.randint (1e8)
         model = self.load_model(noise)
-        print(self.name, [list(ee.parameters())[0].requires_grad for ee in self.extractors(model)])
 
         CB = LearnEndCallback()
         model.learn(total_timesteps=self.roleout_epi, tb_log_name=self.name, callback=CB, log_interval=self.unit_episode)
         self.buffer = model.replay_buffer
-
         print("===========   EVAL   =======   ", self.name, self.iter, ",FPS: ", CB.fps)
         train = {
             "1_Actor_loss": CB.last_aloss,
@@ -213,7 +197,6 @@ class IterRun:
         done = False
         rewards = []
         while not done:
-            obs = self.env.normalize_obs(obs)
             action, _states = model.predict(obs)
             obs, reward, done, info = env.cont_step(action)
             rewards.append(reward)

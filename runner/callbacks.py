@@ -33,6 +33,8 @@ class LearnEndCallback(BaseCallback):
         self.last_aloss = log["train/actor_loss"]
         self.last_closs = log["train/critic_loss"]
         number_delta = (self.model._n_updates - self.start_num) * self.model.batch_size
-        self.fps = int( number_delta/ (time.time()-self.start_tm))
+
+        all_tim = (time.time()-self.start_tm)
+        self.fps = int(number_delta/ all_tim) if all_tim > 0.0001 else 1
 
 

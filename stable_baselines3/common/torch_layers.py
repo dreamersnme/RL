@@ -58,7 +58,7 @@ def create_mlp(
         input_dim: int,
         output_dim: int,
         net_arch: List[int],
-        activation_fn: Type[nn.Module] = nn.ReLU,
+        activation_fn: Type[nn.Module] = nn.Mish,
         squash_output: bool = False,
 ) -> List[nn.Module]:
     """
@@ -125,7 +125,7 @@ class MlpExtractor(nn.Module):
             self,
             feature_dim: int,
             net_arch: List[Union[int, Dict[str, List[int]]]],
-            activation_fn: Type[nn.Module],
+            activation_fn: Type[nn.Module] =nn.Mish,
             device: Union[th.device, str] = "auto",
     ):
         super(MlpExtractor, self).__init__()
@@ -256,17 +256,16 @@ def get_actor_critic_arch(net_arch: Union[List[int], Dict[str, List[int]]]) -> T
     return actor_arch, critic_arch
 
 
-from SOL.model import CombinedModel
 
 class CombinedExtractor (BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Box):
         super(CombinedExtractor, self).__init__(observation_space, features_dim=1)
-        self.combined = CombinedModel(observation_space)
+        self.obs = FlattenExtractor(observation_space[OBS])
         self.stat = FlattenExtractor(observation_space[STAT])
-        self._features_dim = self.combined.features_dim + self.stat.features_dim
+        self._features_dim = self.obs.features_dim + self.stat.features_dim
        
     def forward(self, observations: TensorDict) -> th.Tensor:
-        feature = self.combined(observations)
+        feature = self.obs(observations[OBS])
         stat = self.stat(observations[STAT])
         return th.cat([feature, stat], dim=1)
 

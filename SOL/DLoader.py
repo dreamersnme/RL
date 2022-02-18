@@ -9,17 +9,11 @@ from SOL import extractor
 from stable_baselines3.common import utils
 from stable_baselines3.common.running_mean_std import RunningMeanStd
 
-PRICE = "price"
-TA ='ta'
-DIRECT = "direct"
-DEVICE ="cuda"
+
 class DLoader(Dataset):
     thresold = 0.09
-
     def __init__(self, data, spec):
         self.spec = spec
-        self.neg_direct = 0
-        self.pos_direct = 0
         self.seq = spec.obs_seq
         self.ta_seq = spec.ta_seq
         self.feature_len = spec.obs_len
@@ -32,9 +26,7 @@ class DLoader(Dataset):
         self.daily_idx = np.array([0]+self.daily_size).cumsum()
         self.data = self.up_gpu(spec.scaling(data))
 
-
     def cal_direction(self, price):
-
         plus = np.where(price>=self.thresold, 1, 0)
         mius = np.where(price<=-self.thresold, -1, 0)
         return plus + mius
@@ -51,6 +43,9 @@ class DLoader(Dataset):
             days[day_no]=day_data
         return days
 
+    def day_data(self):
+        days =[self.data[i] for i in range(len(self.data))]
+        return days
 
     def day_search(self, idx):
         left = 0
@@ -73,6 +68,46 @@ class DLoader(Dataset):
 
     def __len__(self):
         return int(self.daily_idx[-1])
+
+
+
+
+class RLDLoader:
+    def __init__(self, data, spec):
+        self.spec = spec
+        self.seq = spec.obs_seq
+        self.ta_seq = spec.ta_seq
+        self.feature_len = spec.obs_len
+        self.base_len = spec.base_len
+        self.price_len = spec.price_len
+
+        self.day_cnt = len(data)
+        self.daily_size = [day.obs.shape[0] - self.seq+1 for day in data]
+        self.daily_idx = np.array([0]+self.daily_size).cumsum()
+        data = spec.norm_obs(data)
+        self.data = self.make_seq(data)
+
+
+    @property
+    def day_data(self):
+        return self.data
+
+    def make_seq(self, data):
+        day_data =[]
+        for day in data:
+            obses =[]
+            pricees = []
+
+            for idx in range(day.obs.shape[0] - self.seq+1):
+                s_idx = idx
+                e_idx = idx + self.seq - 1
+                obs = day.obs[s_idx: e_idx + 1]
+                obses.append(obs)
+                pricees.append(day.price[e_idx])
+
+            day_data.append({OBS: np.array(obses), BASE: day.base,  PRICE:np.array(pricees)})
+        return day_data
+
 
 
 if __name__ == "__main__":

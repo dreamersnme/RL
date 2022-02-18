@@ -296,7 +296,7 @@ class SACPolicy(BasePolicy):
         self.actor.optimizer = self.optimizer_class(self.actor.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs)
 
         if self.share_features_extractor:
-            print("!!!!!!!!!!!!!!!!!!1")
+
             self.critic = self.make_critic(features_extractor=self.actor.features_extractor)
             # Do not optimize the shared features extractor with the critic loss
             # otherwise, there are gradient computation issues
@@ -482,7 +482,7 @@ class MultiInputPolicy(SACPolicy):
         action_space: gym.spaces.Space,
         lr_schedule: Schedule,
         net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
-        activation_fn: Type[nn.Module] = nn.ReLU,
+        activation_fn: Type[nn.Module] = nn.Mish,
         use_sde: bool = False,
         log_std_init: float = -3,
         sde_net_arch: Optional[List[int]] = None,

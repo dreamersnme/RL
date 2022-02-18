@@ -177,7 +177,7 @@ class TD3Policy(BasePolicy):
 
         if self.share_features_extractor:
             self.critic = self.make_critic(features_extractor=self.actor.features_extractor)
-            print("ssssssssssssssssssssss")
+
             # Critic target should not share the features extactor with critic
             # but it can share it with the actor target as actor and critic are sharing
             # the same features_extractor too
@@ -329,7 +329,7 @@ class MultiInputPolicy(TD3Policy):
         action_space: gym.spaces.Space,
         lr_schedule: Schedule,
         net_arch: Optional[Union[List[int], Dict[str, List[int]]]] = None,
-        activation_fn: Type[nn.Module] = nn.ReLU,
+        activation_fn: Type[nn.Module] = nn.Mish,
         features_extractor_class: Type[BaseFeaturesExtractor] = CombinedExtractor,
         features_extractor_kwargs: Optional[Dict[str, Any]] = None,
         normalize_images: bool = True,
