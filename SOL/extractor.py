@@ -214,7 +214,7 @@ def _load(target, trim):
 
 
 def load_ml():
-    return _load (['re1']
+    return _load (['re1','re2']
                   , ['st_dt', 'transaction', 'm_diff', 're1', 're2', 're3', 're4', 're5'])
 
 
