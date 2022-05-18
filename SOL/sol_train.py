@@ -6,9 +6,12 @@ from torch.utils.data import DataLoader
 
 from SOL import extractor
 from SOL.DLoader import DLoader
+from SOL.dtw_model import OutterModel2
 from SOL.extractor import Extractor
-from SOL.model import *
+
 from CONFIG import *
+import torch as th
+import torch.nn as nn
 
 
 device = 'cuda' if th.cuda.is_available() else 'cpu'
@@ -144,6 +147,7 @@ def val(model, dataset):
 
 
 
+PRE_MODEL = OutterModel2
 
 class CECK():
     best_loss = 1000
@@ -158,12 +162,12 @@ class CECK():
 
     def load(self, spec):
         try:
-            model = OutterModel(spec).to(device)
+            model = PRE_MODEL(spec).to(device)
             model.load_state_dict(th.load(self.file_name))
             return model
         except:
             print("NEW MODEL")
-            model = OutterModel(spec).to(device)
+            model = PRE_MODEL(spec).to(device)
             model.printsummary()
             return model
 
