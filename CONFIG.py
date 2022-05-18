@@ -32,10 +32,10 @@ scaler = Standardizer
 
 class DataSpec:
     # obs_seq = 17
-    obs_seq = 9
+    obs_seq = 20
     ta_seq = 5
     stat_len = 1
-    featured_feature =64
+    featured_feature =32
     def __init__(self, ori_data):
         ref = ori_data[0]
         self.obs_len = ref.obs.shape[1]
